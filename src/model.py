@@ -6,14 +6,23 @@ class Tile(object):
     def __init__(self, tree):
         self.tree = tree
 
+def soldierNames():
+    names = ['Antti', 'Eppi', 'Purzel', 'Maija', 'Misse', 'Donald', 'Dagobert', 'Mickey', 'Goofy', 'Arnold', 'Bruce', 'Sylvester', 'Renny']
+    for n in names:
+        yield n
+
 class Soldier(object):
-    def __init__(self, x, y, team):
+    def __init__(self, x, y, team, name):
         self.x = x
         self.y = y
         self.team = team
+        self.name = name
 
     def getPosition(self):
         return self.x, self.y
+
+    def getName(self):
+        return self.name
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):
@@ -26,13 +35,17 @@ class Battlefield(object):
         self.soldiers = list()
         self.terrain = dict()
         self.listeners = list()
+        names = soldierNames()
         for i in xrange(8):
             t = i % 2
             if t == 0:
                 x = 0
+                n = names.next()
             else:
                 x = self.w - 1
-            self.soldiers.append(Soldier(x, i, t))
+                n = 'enemy'
+            
+            self.soldiers.append(Soldier(x, i, t, n))
 
         random.seed(21)
 

@@ -12,6 +12,8 @@ class Tile(object):
         self.t
 
 class View(object):
+    infobarHeight = 8
+
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.bf = model.Battlefield()
@@ -43,9 +45,9 @@ class View(object):
         curses.echo()
         curses.endwin()
 
-    def draw(self):
+    def drawTerrain(self):
         for x in xrange(min(self.winx - 1, self.bf.w)):
-            for y in xrange(min(self.winy - 1, self.bf.h)):
+            for y in xrange(min(self.winy - 1 - View.infobarHeight, self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
                 if sold:
@@ -62,6 +64,16 @@ class View(object):
                     color = 4
                 self.stdscr.addch(y, x, char, curses.color_pair(color))
 
+    def drawInfobar(self):
+        xpos = 0
+        for sold in self.bf.soldiers:
+            if sold.team == 0:
+                self.stdscr.addstr(self.winy - 1 - View.infobarHeight, xpos, sold.getName())
+                xpos += 20
+
+    def draw(self):
+        self.drawTerrain()
+        self.drawInfobar()
         self.stdscr.move(self.controller.state.cursorpos[1], self.controller.state.cursorpos[0])
         self.stdscr.refresh()
 
