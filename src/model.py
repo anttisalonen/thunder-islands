@@ -71,6 +71,9 @@ class Soldier(object):
         self.attributes = attributes
         self.aps = 0
 
+    def setPosition(self, pos):
+        self.x, self.y = pos[0], pos[1]
+
     def getPosition(self):
         return self.x, self.y
 
@@ -96,6 +99,8 @@ class Battlefield(object):
         self.soldiers = list()
         self.terrain = dict()
         self.listeners = list()
+        self.moveTarget = None
+
         names = soldierNames()
         for i in xrange(8):
             t = i % 2
@@ -164,6 +169,24 @@ class Battlefield(object):
         if not self.passable(x, y):
             raise InvalidMovementError()
         return 3
+
+    def moveTo(self, x, y):
+        self.moveTarget = self.getPath(self.getCurrentSoldier().getPosition(), (x, y))
+
+    def updateMovement(self):
+        soldier = self.getCurrentSoldier()
+        assert soldier.getPosition() == self.moveTarget[0]
+        self.moveTarget.pop(0)
+        if not self.moveTarget:
+            return
+        nextStep = self.moveTarget[0]
+        assert self.passable(nextStep[0], nextStep[1]), '%dx%d is not passable' % nextStep
+        cost = self.movementCost(nextStep[0], nextStep[1])
+        if soldier.aps < cost:
+            self.moveTarget = None
+            return
+        soldier.aps -= cost
+        soldier.setPosition(nextStep)
 
 def main():
     bf = Battlefield()

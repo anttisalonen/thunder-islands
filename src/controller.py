@@ -9,6 +9,7 @@ class ControllerState(object):
         self.cursorpos = 5, 5
         self.bf = bf
         self.freeCursor = False
+        self.movementRequested = False
 
     def moveCursor(self, x, y):
         nx = self.cursorpos[0] + x
@@ -39,7 +40,7 @@ class Controller(model.BattlefieldListener):
         if c == ord('q'):
             return False
 
-        if True or self.state.freeCursor:
+        if self.state.freeCursor:
             if c == curses.KEY_DOWN or c == 50:
                 self.state.moveCursor(0, 1)
             elif c == curses.KEY_UP or c == 56:
@@ -56,4 +57,7 @@ class Controller(model.BattlefieldListener):
                 self.state.moveCursor(-1, -1)
             elif c == 57:
                 self.state.moveCursor(1, -1)
+            elif c == 10 or c == 13 or c == curses.KEY_ENTER:
+                self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
         return True
+

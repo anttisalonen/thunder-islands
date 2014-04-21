@@ -20,17 +20,17 @@ class Path(object):
         self.calcPathCost()
 
     def calcPathCost(self):
-        self.path_cost = None
+        path_cost = None
         if self.path:
-            self.path_cost = 0
+            path_cost = [0]
+            curr_path_cost = 0
             for n in self.path[1:]:
-                self.path_cost += self.bf.movementCost(n[0], n[1])
+                curr_path_cost += self.bf.movementCost(n[0], n[1])
+                path_cost.append(curr_path_cost)
+            self.path = zip(self.path, path_cost)
 
     def getPath(self):
         return self.path
-
-    def getPathCost(self):
-        return self.path_cost
 
     def changeCoord(self, start, end):
         if start != self.start or end != self.end:
@@ -57,6 +57,8 @@ class View(object):
         curses.init_pair(2, 4, 7) # soldier team 2
         curses.init_pair(3, 2, 0) # tree
         curses.init_pair(4, 3, 0) # grass
+        curses.init_pair(5, 7, 0) # path with enough APs
+        curses.init_pair(6, 7, 1) # path without enough APs
 
         self.stdscr.leaveok(0)
 
@@ -99,21 +101,26 @@ class View(object):
         for sold in self.bf.soldiers:
             if sold.team == 0:
                 self.stdscr.addstr(ypos, xpos, sold.getName())
-                self.stdscr.addstr(ypos + 1, xpos, '%d' % sold.getAPs())
+                self.stdscr.addstr(ypos + 1, xpos, '%-4d' % sold.getAPs())
                 xpos += 20
 
         xpos = 0
         if self.path.getPath():
-            neededAPs = self.path.getPathCost()
-            self.stdscr.addstr(ypos + 2, xpos, '%d' % neededAPs)
+            neededAPs = self.path.getPath()[-1][1]
+            self.stdscr.addstr(ypos + 2, xpos, '%-4d' % neededAPs)
         else:
             self.stdscr.addstr(ypos + 2, xpos, '    ')
 
     def drawPath(self):
-        self.path.changeCoord(self.bf.getCurrentSoldier().getPosition(), self.controller.state.cursorpos)
+        soldier = self.bf.getCurrentSoldier()
+        self.path.changeCoord(soldier.getPosition(), self.controller.state.cursorpos)
         if self.path.getPath():
-            for p in self.path.getPath():
-                self.stdscr.addch(p[1], p[0], 'x')
+            for p in self.path.getPath()[1:]:
+                if p[1] < soldier.getAPs():
+                    color = 5
+                else:
+                    color = 6
+                self.stdscr.addch(p[0][1], p[0][0], 'x', curses.color_pair(color))
 
     def draw(self):
         self.drawTerrain()
@@ -123,7 +130,10 @@ class View(object):
         self.stdscr.refresh()
 
     def getInput(self):
-        self.running = self.controller.getInput()
+        if not self.bf.moveTarget:
+            self.running = self.controller.getInput()
+        else:
+            self.bf.updateMovement()
 
 def main(stdscr):
     view = View(stdscr)
