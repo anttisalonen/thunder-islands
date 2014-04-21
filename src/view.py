@@ -109,7 +109,7 @@ class View(object):
                 xpos += 20
 
         xpos = 0
-        if self.path.getPath():
+        if self.path.getPath() and self.bf.getCurrentSoldier().team == 0:
             neededAPs = self.path.getPath()[-1][1]
             self.stdscr.addstr(ypos + 2, xpos, '%-4d' % neededAPs)
         else:
@@ -117,6 +117,8 @@ class View(object):
 
     def drawPath(self):
         soldier = self.bf.getCurrentSoldier()
+        if soldier.team != 0:
+            return
         self.path.changeCoord(soldier.getPosition(), self.controller.state.cursorpos)
         if self.path.getPath():
             for p in self.path.getPath()[1:]:
@@ -134,10 +136,14 @@ class View(object):
         self.stdscr.refresh()
 
     def getInput(self):
-        if not self.bf.moveTarget:
-            self.running = self.controller.getInput()
+        soldier = self.bf.getCurrentSoldier()
+        if soldier.team != 0:
+            self.bf.updateAI()
         else:
-            self.bf.updateMovement()
+            if not self.bf.moveTarget:
+                self.running = self.controller.getInput()
+            else:
+                self.bf.updateMovement()
 
 def main(stdscr):
     view = View(stdscr)

@@ -67,5 +67,7 @@ class Controller(model.BattlefieldListener):
                 self.bf.setCurrentSoldier(0, 2)
             elif c == curses.KEY_F5:
                 self.bf.setCurrentSoldier(0, 3)
+            elif c == ord(' '):
+                self.bf.endTurn()
         return True
 

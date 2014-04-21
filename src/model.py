@@ -202,6 +202,17 @@ class Battlefield(object):
         soldier.aps -= cost
         soldier.setPosition(nextStep)
 
+    def endTurn(self):
+        currentTeam = self.getCurrentSoldier().team
+        nextTeam = 1 if currentTeam == 0 else 0
+        if nextTeam == 0:
+            for s in self.soldiers:
+                s.refreshAPs()
+        self.setCurrentSoldier(nextTeam, 0)
+
+    def updateAI(self):
+        self.endTurn()
+
 def main():
     bf = Battlefield()
 
