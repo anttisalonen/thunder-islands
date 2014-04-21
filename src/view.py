@@ -66,9 +66,11 @@ class View(object):
 
     def drawInfobar(self):
         xpos = 0
+        ypos = self.winy - 1 - View.infobarHeight
         for sold in self.bf.soldiers:
             if sold.team == 0:
-                self.stdscr.addstr(self.winy - 1 - View.infobarHeight, xpos, sold.getName())
+                self.stdscr.addstr(ypos, xpos, sold.getName())
+                self.stdscr.addstr(ypos + 1, xpos, '%d' % sold.getAPs())
                 xpos += 20
 
     def draw(self):

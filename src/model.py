@@ -11,18 +11,37 @@ def soldierNames():
     for n in names:
         yield n
 
+class SoldierAttributes(object):
+    def __init__(self, name, stamina):
+        self.name = name
+        self.stamina = stamina
+
+def getSoldierAttributes(enemy, names):
+    stamina = random.randrange(50, 90)
+    if enemy:
+        return SoldierAttributes('enemy', stamina)
+    else:
+        return SoldierAttributes(names.next(), stamina)
+
 class Soldier(object):
-    def __init__(self, x, y, team, name):
+    def __init__(self, x, y, team, attributes):
         self.x = x
         self.y = y
         self.team = team
-        self.name = name
+        self.attributes = attributes
+        self.aps = 0
 
     def getPosition(self):
         return self.x, self.y
 
     def getName(self):
-        return self.name
+        return self.attributes.name
+
+    def getAPs(self):
+        return self.aps
+
+    def refreshAPs(self):
+        self.aps = self.attributes.stamina * 25 / 100
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):
@@ -40,12 +59,10 @@ class Battlefield(object):
             t = i % 2
             if t == 0:
                 x = 0
-                n = names.next()
             else:
                 x = self.w - 1
-                n = 'enemy'
-            
-            self.soldiers.append(Soldier(x, i, t, n))
+
+            self.soldiers.append(Soldier(x, i, t, getSoldierAttributes(t != 0, names)))
 
         random.seed(21)
 
@@ -54,6 +71,9 @@ class Battlefield(object):
             for j in xrange(self.h):
                 tree = i != 0 and i != self.w - 1 and random.randrange(3) == 0
                 self.terrain[i][j] = Tile(tree)
+
+        for s in self.soldiers:
+            s.refreshAPs()
 
     def addListener(self, listener):
         self.listeners.append(listener)
