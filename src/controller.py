@@ -10,8 +10,10 @@ class ControllerState(object):
         self.bf = bf
         self.freeCursor = False
         self.movementRequested = False
+        self.aiming = 0
 
     def moveCursor(self, x, y):
+        self.stopAim()
         nx = self.cursorpos[0] + x
         ny = self.cursorpos[1] + y
         nx = min(nx, self.bf.w - 1)
@@ -19,6 +21,19 @@ class ControllerState(object):
         ny = min(ny, self.bf.h - 1)
         ny = max(ny, 0)
         self.cursorpos = nx, ny
+
+    def aim(self):
+        self.aiming += 1
+        if self.aiming == 5:
+            self.aiming = 0
+
+    def stopAim(self):
+        self.aiming = 0
+
+    def shoot(self):
+        if self.aiming != 0:
+            self.bf.shoot(self.cursorpos[0], self.cursorpos[1], self.aiming)
+        self.stopAim()
 
 class Controller(model.BattlefieldListener):
     def __init__(self, bf, stdscr):
@@ -58,16 +73,26 @@ class Controller(model.BattlefieldListener):
             elif c == 57:
                 self.state.moveCursor(1, -1)
             elif c == 10 or c == 13 or c == curses.KEY_ENTER:
+                self.state.stopAim()
                 self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
             elif c == curses.KEY_F2:
+                self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 0)
             elif c == curses.KEY_F3:
+                self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 1)
             elif c == curses.KEY_F4:
+                self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 2)
             elif c == curses.KEY_F5:
+                self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 3)
             elif c == ord(' '):
+                self.state.stopAim()
                 self.bf.endTurn()
+            elif c == ord('f'):
+                self.state.aim()
+            elif c == ord('F'):
+                self.state.shoot()
         return True
 

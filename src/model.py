@@ -2,6 +2,8 @@
 
 import random
 import collections
+import math
+
 import astar
 
 class InvalidMovementError(object):
@@ -100,6 +102,7 @@ class Battlefield(object):
         self.terrain = dict()
         self.listeners = list()
         self.moveTarget = None
+        self.shootLine = None
         self.currentSoldierIndex = 0
 
         names = soldierNames()
@@ -213,8 +216,73 @@ class Battlefield(object):
     def updateAI(self):
         self.endTurn()
 
+    def distance(self, a, b):
+        xd = abs(a[0] - b[0])
+        yd = abs(a[1] - b[1])
+        return math.sqrt(xd * xd + yd * yd)
+
+    def shoot(self, x, y, aiming):
+        assert aiming > 0 and aiming < 5
+        cost = 10
+        sold = self.getCurrentSoldier()
+        if sold.aps < cost:
+            return
+        sold.aps -= cost
+
+        soldpos = sold.getPosition()
+        shootLine = self.line(soldpos[0], soldpos[1], x, y)
+        self.shootLine = shootLine[1:10]
+
+    def updateShot(self):
+        shotpos = self.shootLine.pop(0)
+        x, y = shotpos[0]
+        if self.terrain[x][y].tree:
+            self.shootLine = None
+            return
+        hit = self.soldierAt(x, y)
+        if hit:
+            self.shootLine = None
+            #hit.decreaseHealth(20)
+            return
+
+    def line(self, x0, y0, x1, y1):
+        # Bresenham
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        if x0 < x1: sx = 1
+        else:       sx = -1
+        if y0 < y1: sy = 1
+        else:       sy = -1
+        err = dx - dy
+        origErr = err
+
+        ret = list()
+        errRet = list()
+
+        while True:
+            if x0 == x1 and y0 == y1:
+                errRet.append(0)
+            else:
+                errRet.append(abs((origErr - err) / float(max(dx, dy))))
+            ret.append((x0, y0))
+            if x0 == x1 and y0 == y1:
+                return zip(ret, errRet)
+            e2 = 2 * err
+            if e2 > -dy:
+                err = err - dy
+                x0 = x0 + sx
+            if e2 < dx:
+                err = err + dx
+                y0 = y0 + sy
+
 def main():
     bf = Battlefield()
+    ps1 = [(0, 0), (5, 6), (8, 8), (3, 2), (3298, 489), (347, 38)]
+    ps2 = [(84, 47), (347, 48), (337, 38), (357, 38), (347, 28), (37, 3), (2, 2), (0, 0), (3, 2), (484, 9293), (484, 484), (200, 200)]
+    for sp in ps1:
+        for ep in ps2:
+            l = bf.line(sp[0], sp[1], ep[0], ep[1])
+            print sp, ep, max(l[1]), sum(l[1]) / float(len(l[1]))
 
 if __name__ == '__main__':
     main()
