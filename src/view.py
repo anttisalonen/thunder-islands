@@ -57,8 +57,8 @@ class View(object):
         curses.init_pair(2, 4, 7) # soldier team 2
         curses.init_pair(3, 2, 0) # tree
         curses.init_pair(4, 3, 0) # grass
-        curses.init_pair(5, 7, 0) # path with enough APs
-        curses.init_pair(6, 7, 1) # path without enough APs
+        curses.init_pair(5, 7, 0) # path with enough APs, selected soldier name
+        curses.init_pair(6, 7, 1) # path without enough APs, unselected soldier name
 
         self.stdscr.leaveok(0)
 
@@ -100,8 +100,12 @@ class View(object):
         ypos = self.winy - 1 - View.infobarHeight
         for sold in self.bf.soldiers:
             if sold.team == 0:
-                self.stdscr.addstr(ypos, xpos, sold.getName())
-                self.stdscr.addstr(ypos + 1, xpos, '%-4d' % sold.getAPs())
+                if sold == self.bf.getCurrentSoldier():
+                    color = 5
+                else:
+                    color = 6
+                self.stdscr.addstr(ypos, xpos, sold.getName(), curses.color_pair(color))
+                self.stdscr.addstr(ypos + 1, xpos, '%-4d' % sold.getAPs(), curses.color_pair(color))
                 xpos += 20
 
         xpos = 0

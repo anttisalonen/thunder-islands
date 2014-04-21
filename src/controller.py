@@ -59,5 +59,13 @@ class Controller(model.BattlefieldListener):
                 self.state.moveCursor(1, -1)
             elif c == 10 or c == 13 or c == curses.KEY_ENTER:
                 self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
+            elif c == curses.KEY_F2:
+                self.bf.setCurrentSoldier(0, 0)
+            elif c == curses.KEY_F3:
+                self.bf.setCurrentSoldier(0, 1)
+            elif c == curses.KEY_F4:
+                self.bf.setCurrentSoldier(0, 2)
+            elif c == curses.KEY_F5:
+                self.bf.setCurrentSoldier(0, 3)
         return True
 

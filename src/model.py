@@ -100,6 +100,7 @@ class Battlefield(object):
         self.terrain = dict()
         self.listeners = list()
         self.moveTarget = None
+        self.currentSoldierIndex = 0
 
         names = soldierNames()
         for i in xrange(8):
@@ -131,7 +132,20 @@ class Battlefield(object):
         return None
 
     def getCurrentSoldier(self):
-        return self.soldiers[0]
+        return self.soldiers[self.currentSoldierIndex]
+
+    def setCurrentSoldier(self, team, number):
+        thisNum = 0
+        thisIndex = 0
+        for sold in self.soldiers:
+            if sold.team == team:
+                if thisNum == number:
+                    self.currentSoldierIndex = thisIndex
+                    for l in self.listeners:
+                        l.currentSoldierChanged()
+                    return
+                thisNum += 1
+            thisIndex += 1
 
     def getPath(self, start, end):
         if not self.passable(end[0], end[1]):
