@@ -11,12 +11,41 @@ class Tile(object):
         self.tile = dict()
         self.t
 
+class Path(object):
+    def __init__(self, bf, start, end):
+        self.bf = bf
+        self.start = start
+        self.end = end
+        self.path = self.bf.getPath(self.start, self.end)
+        self.calcPathCost()
+
+    def calcPathCost(self):
+        self.path_cost = None
+        if self.path:
+            self.path_cost = 0
+            for n in self.path[1:]:
+                self.path_cost += self.bf.movementCost(n[0], n[1])
+
+    def getPath(self):
+        return self.path
+
+    def getPathCost(self):
+        return self.path_cost
+
+    def changeCoord(self, start, end):
+        if start != self.start or end != self.end:
+            self.start = start
+            self.end = end
+            self.path = self.bf.getPath(self.start, self.end)
+            self.calcPathCost()
+
 class View(object):
     infobarHeight = 8
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.bf = model.Battlefield()
+        self.path = Path(self.bf, (0,0), (0,0))
 
     def run(self):
         curses.noecho()
@@ -73,8 +102,22 @@ class View(object):
                 self.stdscr.addstr(ypos + 1, xpos, '%d' % sold.getAPs())
                 xpos += 20
 
+        xpos = 0
+        if self.path.getPath():
+            neededAPs = self.path.getPathCost()
+            self.stdscr.addstr(ypos + 2, xpos, '%d' % neededAPs)
+        else:
+            self.stdscr.addstr(ypos + 2, xpos, '    ')
+
+    def drawPath(self):
+        self.path.changeCoord(self.bf.getCurrentSoldier().getPosition(), self.controller.state.cursorpos)
+        if self.path.getPath():
+            for p in self.path.getPath():
+                self.stdscr.addch(p[1], p[0], 'x')
+
     def draw(self):
         self.drawTerrain()
+        self.drawPath()
         self.drawInfobar()
         self.stdscr.move(self.controller.state.cursorpos[1], self.controller.state.cursorpos[0])
         self.stdscr.refresh()

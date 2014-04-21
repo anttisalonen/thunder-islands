@@ -1,6 +1,46 @@
 #!/usr/bin/env python2.7
 
 import random
+import collections
+import astar
+
+class InvalidMovementError(object):
+    pass
+
+class PQueue(object):
+    def __init__(self):
+        self.d = collections.OrderedDict()
+        self.d2 = collections.OrderedDict()
+
+    def push(self, prio, item):
+        self.d[item] = prio
+        try:
+            self.d2[prio].append(item)
+        except KeyError:
+            self.d2[prio] = list()
+            self.d2[prio].append(item)
+
+    def pop(self):
+        itl = self.d2.items()[0][1] # may raise IndexError
+        it = itl.pop()
+        if not itl:
+            del self.d2.items()[0]
+        del self.d[it]
+        return it
+
+    def setPriority(self, prio, item):
+        oldprio = self.d[item]
+        itl = self.d2[oldprio]
+        itl = [x for x in x if x != item]
+        try:
+            self.d2[prio].append(item)
+        except KeyError:
+            self.d2[prio] = list()
+            self.d2[prio].append(item)
+        self.d[item] = prio
+
+    def empty(self):
+        return bool(self.d)
 
 class Tile(object):
     def __init__(self, tree):
@@ -49,6 +89,8 @@ class BattlefieldListener(object):
 
 class Battlefield(object):
     def __init__(self):
+        random.seed(21)
+
         self.w = 80
         self.h = 40
         self.soldiers = list()
@@ -63,8 +105,6 @@ class Battlefield(object):
                 x = self.w - 1
 
             self.soldiers.append(Soldier(x, i, t, getSoldierAttributes(t != 0, names)))
-
-        random.seed(21)
 
         for i in xrange(self.w):
             self.terrain[i] = dict()
@@ -87,6 +127,43 @@ class Battlefield(object):
 
     def getCurrentSoldier(self):
         return self.soldiers[0]
+
+    def getPath(self, start, end):
+        if not self.passable(end[0], end[1]):
+            return None
+
+        def neighbours(v):
+            ret = list()
+            for i in xrange(-1, 2):
+                for j in xrange(-1, 2):
+                    if i == 0 and j == 0:
+                        continue
+                    nx = v[0] + i
+                    ny = v[1] + j
+                    if nx < 0 or ny < 0 or nx >= self.w or ny >= self.h:
+                        continue
+                    if self.passable(nx, ny):
+                        ret.append((nx, ny))
+            return ret
+
+        def costfunc(n1, n2):
+            return self.movementCost(n2[0], n2[1])
+
+        path = astar.solve(neighbours, costfunc, astar.manhattanHeuristics(end),
+                astar.makeGoalFunc(end), start)
+        return path
+
+    def passable(self, x, y):
+        if self.terrain[x][y].tree:
+            return False
+        if self.soldierAt(x, y) != None:
+            return False
+        return True
+
+    def movementCost(self, x, y):
+        if not self.passable(x, y):
+            raise InvalidMovementError()
+        return 3
 
 def main():
     bf = Battlefield()
