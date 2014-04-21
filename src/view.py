@@ -4,6 +4,7 @@ import curses
 import time
 
 import model
+import controller
 
 class Tile(object):
     def __init__(self):
@@ -26,10 +27,25 @@ class View(object):
         curses.init_pair(3, 2, 0) # tree
         curses.init_pair(4, 3, 0) # grass
 
-        winy, winx = self.stdscr.getmaxyx()
+        self.stdscr.leaveok(0)
 
-        for x in xrange(min(winx - 1, self.bf.w)):
-            for y in xrange(min(winy - 1, self.bf.h)):
+        self.winy, self.winx = self.stdscr.getmaxyx()
+        self.running = True
+        self.controller = controller.Controller(self.bf, self.stdscr)
+
+        while self.running:
+            self.draw()
+            self.getInput()
+
+        # cleanup
+        curses.nocbreak()
+        self.stdscr.keypad(0)
+        curses.echo()
+        curses.endwin()
+
+    def draw(self):
+        for x in xrange(min(self.winx - 1, self.bf.w)):
+            for y in xrange(min(self.winy - 1, self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
                 if sold:
@@ -46,14 +62,11 @@ class View(object):
                     color = 4
                 self.stdscr.addch(y, x, char, curses.color_pair(color))
 
+        self.stdscr.move(self.controller.state.cursorpos[1], self.controller.state.cursorpos[0])
         self.stdscr.refresh()
-        self.stdscr.getch()
 
-        # cleanup
-        curses.nocbreak()
-        self.stdscr.keypad(0)
-        curses.echo()
-        curses.endwin()
+    def getInput(self):
+        self.running = self.controller.getInput()
 
 def main(stdscr):
     view = View(stdscr)
