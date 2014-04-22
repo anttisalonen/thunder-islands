@@ -47,6 +47,7 @@ class View(object):
         self.bf = model.Battlefield()
         self.path = Path(self.bf, (0,0), (0,0))
         self.animDelay = 10
+        self.hitPoint = None
 
     def run(self):
         curses.noecho()
@@ -60,6 +61,7 @@ class View(object):
         curses.init_pair(4, 3, 0) # grass
         curses.init_pair(5, 7, 0) # path with enough APs, selected soldier name
         curses.init_pair(6, 7, 1) # path without enough APs, unselected soldier name, bullet
+        curses.init_pair(7, 7, 3) # bullet hit
 
         self.stdscr.leaveok(0)
 
@@ -142,6 +144,9 @@ class View(object):
                 self.stdscr.addch(p[0][1], p[0][0], 'x', curses.color_pair(color))
 
     def drawBullet(self):
+        if self.hitPoint:
+            self.stdscr.addch(self.hitPoint[1], self.hitPoint[0], '*', curses.color_pair(7))
+            return
         sl = self.bf.shootLine
         if not sl:
             return
@@ -161,16 +166,19 @@ class View(object):
         if soldier.team != 0:
             self.bf.updateAI()
         else:
-            if self.bf.moveTarget or self.bf.shootLine:
+            if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
+                curses.curs_set(0)
                 if self.animDelay > 0:
                     self.animDelay -= 1
                 else:
+                    self.hitPoint = None
                     self.animDelay = 10
                     if self.bf.moveTarget:
                         self.bf.updateMovement()
                     elif self.bf.shootLine:
-                        self.bf.updateShot()
+                        self.hitPoint = self.bf.updateShot()
             else:
+                curses.curs_set(1)
                 self.running = self.controller.getInput()
 
 def main(stdscr):

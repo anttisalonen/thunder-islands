@@ -238,12 +238,12 @@ class Battlefield(object):
         x, y = shotpos[0]
         if self.terrain[x][y].tree:
             self.shootLine = None
-            return
+            return x, y
         hit = self.soldierAt(x, y)
         if hit:
             self.shootLine = None
             #hit.decreaseHealth(20)
-            return
+            return x, y
 
     def line(self, x0, y0, x1, y1):
         # Bresenham
