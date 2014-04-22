@@ -109,9 +109,15 @@ class View(object):
                 else:
                     color = 6
                 self.stdscr.addstr(ypos, xpos, sold.getName(), curses.color_pair(color))
-                self.stdscr.addstr(ypos + 1, xpos, '%-4d' % sold.getAPs(), curses.color_pair(color))
+                if sold.alive():
+                    self.stdscr.addstr(ypos + 1, xpos, 'APs:    %-4d' % sold.getAPs(), curses.color_pair(color))
+                    self.stdscr.addstr(ypos + 2, xpos, 'Health: %-4d' % sold.getHealth(), curses.color_pair(color))
+                else:
+                    self.stdscr.addstr(ypos + 1, xpos, '                ')
+                    self.stdscr.addstr(ypos + 2, xpos, '                ')
                 xpos += 20
 
+        yoffset = 3
         xpos = 0
         if currsold.team == 0:
             if self.path.getPath():
@@ -119,14 +125,14 @@ class View(object):
                 infostr = '%-4d' % neededAPs
             else:
                 infostr = '    '
-            self.stdscr.addstr(ypos + 2, xpos, infostr)
+            self.stdscr.addstr(ypos + yoffset + 0, xpos, infostr)
 
             if self.controller.state.aiming != 0:
                 dist = self.bf.distance(currsold.getPosition(), self.controller.state.cursorpos)
                 shootstr = 'Shooting. Aim: %d, distance: %d     ' % (self.controller.state.aiming, dist)
             else:
                 shootstr = ' ' * 40
-            self.stdscr.addstr(ypos + 3, xpos, shootstr)
+            self.stdscr.addstr(ypos + yoffset + 1, xpos, shootstr)
 
     def drawPath(self):
         if self.bf.shootLine:

@@ -54,16 +54,18 @@ def soldierNames():
         yield n
 
 class SoldierAttributes(object):
-    def __init__(self, name, stamina):
+    def __init__(self, name, stamina, health):
         self.name = name
         self.stamina = stamina
+        self.health = health
 
 def getSoldierAttributes(enemy, names):
     stamina = random.randrange(50, 90)
+    health = random.randrange(50, 90)
     if enemy:
-        return SoldierAttributes('enemy', stamina)
+        return SoldierAttributes('enemy', stamina, health)
     else:
-        return SoldierAttributes(names.next(), stamina)
+        return SoldierAttributes(names.next(), stamina, health)
 
 class Soldier(object):
     def __init__(self, x, y, team, attributes):
@@ -82,11 +84,26 @@ class Soldier(object):
     def getName(self):
         return self.attributes.name
 
+    def decreaseHealth(self, num):
+        assert num > 0
+        self.attributes.health -= num
+        if self.attributes.health < 0:
+            self.attributes.health = 0
+        if self.attributes.health == 0:
+            self.aps = 0
+
+    def alive(self):
+        return self.attributes.health > 0
+
+    def getHealth(self):
+        return self.attributes.health
+
     def getAPs(self):
         return self.aps
 
     def refreshAPs(self):
-        self.aps = self.attributes.stamina * 25 / 100
+        if self.attributes.health > 0:
+            self.aps = self.attributes.stamina * 25 / 100
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):
@@ -130,7 +147,7 @@ class Battlefield(object):
 
     def soldierAt(self, x, y):
         for s in self.soldiers:
-            if s.x == x and s.y == y:
+            if s.alive() and s.x == x and s.y == y:
                 return s
         return None
 
@@ -143,9 +160,10 @@ class Battlefield(object):
         for sold in self.soldiers:
             if sold.team == team:
                 if thisNum == number:
-                    self.currentSoldierIndex = thisIndex
-                    for l in self.listeners:
-                        l.currentSoldierChanged()
+                    if sold.alive():
+                        self.currentSoldierIndex = thisIndex
+                        for l in self.listeners:
+                            l.currentSoldierChanged()
                     return
                 thisNum += 1
             thisIndex += 1
@@ -242,7 +260,7 @@ class Battlefield(object):
         hit = self.soldierAt(x, y)
         if hit:
             self.shootLine = None
-            #hit.decreaseHealth(20)
+            hit.decreaseHealth(40)
             return x, y
 
     def line(self, x0, y0, x1, y1):
