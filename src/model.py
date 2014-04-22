@@ -213,13 +213,13 @@ class Battlefield(object):
         assert soldier.getPosition() == self.moveTarget[0]
         self.moveTarget.pop(0)
         if not self.moveTarget:
-            return
+            return False
         nextStep = self.moveTarget[0]
         assert self.passable(nextStep[0], nextStep[1]), '%dx%d is not passable' % nextStep
         cost = self.movementCost(nextStep[0], nextStep[1])
         if soldier.aps < cost:
             self.moveTarget = None
-            return
+            return True
         soldier.aps -= cost
         soldier.setPosition(nextStep)
 

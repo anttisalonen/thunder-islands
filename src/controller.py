@@ -11,8 +11,10 @@ class ControllerState(object):
         self.freeCursor = False
         self.movementRequested = False
         self.aiming = 0
+        self.message = ''
 
     def moveCursor(self, x, y):
+        self.message = ''
         self.stopAim()
         nx = self.cursorpos[0] + x
         ny = self.cursorpos[1] + y
@@ -33,6 +35,7 @@ class ControllerState(object):
     def shoot(self):
         if self.aiming != 0:
             self.bf.shoot(self.cursorpos[0], self.cursorpos[1], self.aiming)
+            self.message = 'Shot!'
         self.stopAim()
 
 class Controller(model.BattlefieldListener):
@@ -78,17 +81,22 @@ class Controller(model.BattlefieldListener):
             elif c == curses.KEY_F2:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 0)
+                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F3:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 1)
+                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F4:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 2)
+                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F5:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 3)
+                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
             elif c == ord(' '):
                 self.state.stopAim()
+                self.state.message = 'End of turn'
                 self.bf.endTurn()
             elif c == ord('f'):
                 self.state.aim()

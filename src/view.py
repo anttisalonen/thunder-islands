@@ -79,6 +79,13 @@ class View(object):
         curses.echo()
         curses.endwin()
 
+    def posOnScreen(self, pos):
+        cpx, cpy = pos
+        return cpx, cpy + 1
+
+    def cursorPosOnScreen(self):
+        return self.posOnScreen(self.controller.state.cursorpos)
+
     def drawTerrain(self):
         for x in xrange(min(self.winx - 1, self.bf.w)):
             for y in xrange(min(self.winy - 1 - View.infobarHeight, self.bf.h)):
@@ -96,11 +103,18 @@ class View(object):
                 else:
                     char = '.'
                     color = 4
-                self.stdscr.addch(y, x, char, curses.color_pair(color))
+                self.addch((x, y), char, color)
+
+    def drawHeader(self):
+        if self.controller.state.message:
+            msg = self.controller.state.message[:79]
+        else:
+            msg = ''
+        self.stdscr.addstr(0, 0, '%-80s' % msg)
 
     def drawInfobar(self):
         xpos = 0
-        ypos = self.winy - 1 - View.infobarHeight
+        ypos = self.winy - View.infobarHeight
         currsold = self.bf.getCurrentSoldier()
         for sold in self.bf.soldiers:
             if sold.team == 0:
@@ -122,9 +136,9 @@ class View(object):
         if currsold.team == 0:
             if self.path.getPath():
                 neededAPs = self.path.getPath()[-1][1]
-                infostr = '%-4d' % neededAPs
+                infostr = 'Needed APs: %-4d' % neededAPs
             else:
-                infostr = '    '
+                infostr = '                    '
             self.stdscr.addstr(ypos + yoffset + 0, xpos, infostr)
 
             if self.controller.state.aiming != 0:
@@ -147,24 +161,31 @@ class View(object):
                     color = 5
                 else:
                     color = 6
-                self.stdscr.addch(p[0][1], p[0][0], 'x', curses.color_pair(color))
+                pos = self.posOnScreen(p[0])
+                self.addch(p[0], 'x', color)
+
+    def addch(self, pos, ch, color):
+        pos = self.posOnScreen(pos)
+        self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color))
 
     def drawBullet(self):
         if self.hitPoint:
-            self.stdscr.addch(self.hitPoint[1], self.hitPoint[0], '*', curses.color_pair(7))
+            self.addch(self.hitPoint, '*', 7)
             return
         sl = self.bf.shootLine
         if not sl:
             return
         bt = sl[0][0]
-        self.stdscr.addch(bt[1], bt[0], '.', curses.color_pair(6))
+        self.addch(bt, '.', 6)
 
     def draw(self):
         self.drawTerrain()
         self.drawPath()
         self.drawBullet()
         self.drawInfobar()
-        self.stdscr.move(self.controller.state.cursorpos[1], self.controller.state.cursorpos[0])
+        self.drawHeader()
+        cp = self.cursorPosOnScreen()
+        self.stdscr.move(cp[1], cp[0])
         self.stdscr.refresh()
 
     def getInput(self):
@@ -180,7 +201,8 @@ class View(object):
                     self.hitPoint = None
                     self.animDelay = 10
                     if self.bf.moveTarget:
-                        self.bf.updateMovement()
+                        if self.bf.updateMovement():
+                            self.controller.state.message = 'No more APs'
                     elif self.bf.shootLine:
                         self.hitPoint = self.bf.updateShot()
             else:
