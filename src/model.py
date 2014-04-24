@@ -131,7 +131,7 @@ class TerrainCreator(object):
             for j in xrange(width):
                 self.bf.terrain[i][j] = Tile(False, True)
         for i in xrange(6, 1, -1):
-            for iteration in xrange(10):
+            for iteration in xrange(self.bf.w / 4):
                 rad = random.randrange(1, i)
                 pos = random.randrange(0, self.bf.w)
                 water = random.choice([True, False])
