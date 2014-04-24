@@ -34,8 +34,10 @@ class ControllerState(object):
 
     def shoot(self):
         if self.aiming != 0:
-            self.bf.shoot(self.cursorpos[0], self.cursorpos[1], self.aiming)
-            self.message = 'Shot!'
+            if self.bf.shoot(self.cursorpos[0], self.cursorpos[1], self.aiming):
+                self.message = 'Shot!'
+            else:
+                self.message = 'Not enough APs to shoot.'
         self.stopAim()
 
 class Controller(model.BattlefieldListener):

@@ -244,24 +244,25 @@ class Battlefield(object):
         cost = 10
         sold = self.getCurrentSoldier()
         if sold.aps < cost:
-            return
+            return False
         sold.aps -= cost
 
         soldpos = sold.getPosition()
         shootLine = self.line(soldpos[0], soldpos[1], x, y)
         self.shootLine = shootLine[1:10]
+        return True
 
     def updateShot(self):
         shotpos = self.shootLine.pop(0)
         x, y = shotpos[0]
         if self.terrain[x][y].tree:
             self.shootLine = None
-            return x, y
+            return x, y, None
         hit = self.soldierAt(x, y)
         if hit:
             self.shootLine = None
             hit.decreaseHealth(40)
-            return x, y
+            return x, y, hit
 
     def line(self, x0, y0, x1, y1):
         # Bresenham

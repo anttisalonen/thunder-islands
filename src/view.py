@@ -170,7 +170,7 @@ class View(object):
 
     def drawBullet(self):
         if self.hitPoint:
-            self.addch(self.hitPoint, '*', 7)
+            self.addch(self.hitPoint[0:2], '*', 7)
             return
         sl = self.bf.shootLine
         if not sl:
@@ -202,9 +202,12 @@ class View(object):
                     self.animDelay = 10
                     if self.bf.moveTarget:
                         if self.bf.updateMovement():
-                            self.controller.state.message = 'No more APs'
+                            self.controller.state.message = 'No more APs to move.'
                     elif self.bf.shootLine:
                         self.hitPoint = self.bf.updateShot()
+                        if self.hitPoint:
+                            soldierHit = self.hitPoint[2]
+                            self.controller.state.message = 'Hit %s!' % soldierHit.getName()
             else:
                 curses.curs_set(1)
                 self.running = self.controller.getInput()
