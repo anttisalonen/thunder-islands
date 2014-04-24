@@ -6,18 +6,16 @@ import time
 import model
 import controller
 
-class Tile(object):
-    def __init__(self):
-        self.tile = dict()
-        self.t
-
 class Path(object):
     def __init__(self, bf, start, end):
         self.bf = bf
         self.start = start
         self.end = end
-        self.path = self.bf.getPath(self.start, self.end)
-        self.calcPathCost()
+        if self.bf.distance(self.start, self.end) < 20:
+            self.path = self.bf.getPath(self.start, self.end)
+            self.calcPathCost()
+        else:
+            self.path = None
 
     def calcPathCost(self):
         path_cost = None
@@ -36,11 +34,15 @@ class Path(object):
         if start != self.start or end != self.end:
             self.start = start
             self.end = end
-            self.path = self.bf.getPath(self.start, self.end)
-            self.calcPathCost()
+            if self.bf.distance(self.start, self.end) < 20:
+                self.path = self.bf.getPath(self.start, self.end)
+                self.calcPathCost()
+            else:
+                self.path = None
 
 class View(object):
     infobarHeight = 8
+    statusbarHeight = 2
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
@@ -48,6 +50,7 @@ class View(object):
         self.path = Path(self.bf, (0,0), (0,0))
         self.animDelay = 10
         self.hitPoint = None
+        self.screenOffset = 0, 0
 
     def run(self):
         curses.noecho()
@@ -62,6 +65,7 @@ class View(object):
         curses.init_pair(5, 7, 0) # path with enough APs, selected soldier name
         curses.init_pair(6, 7, 1) # path without enough APs, unselected soldier name, bullet
         curses.init_pair(7, 7, 3) # bullet hit
+        curses.init_pair(8, 4, 0) # water
 
         self.stdscr.leaveok(0)
 
@@ -81,14 +85,14 @@ class View(object):
 
     def posOnScreen(self, pos):
         cpx, cpy = pos
-        return cpx, cpy + 1
+        return cpx - self.screenOffset[0], cpy - self.screenOffset[1] + View.statusbarHeight
 
     def cursorPosOnScreen(self):
         return self.posOnScreen(self.controller.state.cursorpos)
 
     def drawTerrain(self):
-        for x in xrange(min(self.winx - 1, self.bf.w)):
-            for y in xrange(min(self.winy - 1 - View.infobarHeight, self.bf.h)):
+        for x in xrange(self.screenOffset[0], min(self.winx + self.screenOffset[0], self.bf.w)):
+            for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
                 if sold:
@@ -100,6 +104,9 @@ class View(object):
                 elif terr.tree:
                     char = 'T'
                     color = 3
+                elif terr.water:
+                    char = '~'
+                    color = 8
                 else:
                     char = '.'
                     color = 4
@@ -147,6 +154,9 @@ class View(object):
             else:
                 shootstr = ' ' * 40
             self.stdscr.addstr(ypos + yoffset + 1, xpos, shootstr)
+            coordTuple = (self.controller.state.cursorpos[0], self.controller.state.cursorpos[1], self.screenOffset[0], self.screenOffset[1])
+            self.stdscr.addstr(ypos + yoffset + 2, xpos, '(%d, %d) (%d, %d)       ' % coordTuple)
+            self.stdscr.addstr(ypos + yoffset + 3, xpos, '%d  ' % self.controller.state.pressedKeyCode)
 
     def drawPath(self):
         if self.bf.shootLine:
@@ -161,12 +171,12 @@ class View(object):
                     color = 5
                 else:
                     color = 6
-                pos = self.posOnScreen(p[0])
                 self.addch(p[0], 'x', color)
 
     def addch(self, pos, ch, color):
         pos = self.posOnScreen(pos)
-        self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color))
+        if pos[1] < self.winy - View.infobarHeight and pos[1] >= View.statusbarHeight and pos[0] >= 0 and pos[0] < self.winx:
+            self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color))
 
     def drawBullet(self):
         if self.hitPoint:
@@ -211,6 +221,15 @@ class View(object):
             else:
                 curses.curs_set(1)
                 self.running = self.controller.getInput()
+                self.checkScreenScroll()
+
+    def checkScreenScroll(self):
+        cp = self.controller.state.cursorpos
+        sx = max(0, self.screenOffset[0], cp[0] - self.winx + 1)
+        sx = min(cp[0], sx)
+        sy = max(0, self.screenOffset[1], cp[1] - self.winy + View.statusbarHeight + 1 + View.infobarHeight)
+        sy = min(cp[1], sy)
+        self.screenOffset = sx, sy
 
 def main(stdscr):
     view = View(stdscr)

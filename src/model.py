@@ -45,8 +45,9 @@ class PQueue(object):
         return bool(self.d)
 
 class Tile(object):
-    def __init__(self, tree):
+    def __init__(self, tree, water):
         self.tree = tree
+        self.water = water
 
 def soldierNames():
     names = ['Antti', 'Eppi', 'Purzel', 'Maija', 'Misse', 'Donald', 'Dagobert', 'Mickey', 'Goofy', 'Arnold', 'Bruce', 'Sylvester', 'Renny']
@@ -109,12 +110,48 @@ class BattlefieldListener(object):
     def currentSoldierChanged(self):
         pass
 
+class TerrainCreator(object):
+    def __init__(self, bf):
+        self.bf = bf
+        for i in xrange(self.bf.w):
+            self.bf.terrain[i] = dict()
+            for j in xrange(self.bf.h):
+                self.bf.terrain[i][j] = Tile(False, False)
+
+    def addRandomForest(self):
+        for i in xrange(self.bf.w):
+            for j in xrange(self.bf.h):
+                if not self.bf.terrain[i][j].water:
+                    tree = i != 0 and i != self.bf.w - 1 and random.randrange(3) == 0
+                    if tree:
+                        self.bf.terrain[i][j] = Tile(tree, False)
+
+    def addCoastLine(self, width):
+        for i in xrange(self.bf.w):
+            for j in xrange(width):
+                self.bf.terrain[i][j] = Tile(False, True)
+        for i in xrange(6, 1, -1):
+            for iteration in xrange(10):
+                rad = random.randrange(1, i)
+                pos = random.randrange(0, self.bf.w)
+                water = random.choice([True, False])
+                for j in xrange(rad * 2):
+                    for k in xrange(rad * 2):
+                        dist = (j - rad) * (j - rad) + (k - rad) * (k - rad)
+                        if math.sqrt(dist) <= rad:
+                            px = pos + j - rad
+                            py = width + k - rad
+                            if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h:
+                                self.bf.terrain[px][py].water = water
+                                if water:
+                                    self.bf.terrain[px][py].tree = False
+
 class Battlefield(object):
     def __init__(self):
         random.seed(21)
 
-        self.w = 80
-        self.h = 40
+        self.w = 200
+        self.h = 120
         self.soldiers = list()
         self.terrain = dict()
         self.listeners = list()
@@ -130,16 +167,17 @@ class Battlefield(object):
             else:
                 x = self.w - 1
 
-            self.soldiers.append(Soldier(x, i, t, getSoldierAttributes(t != 0, names)))
+            self.soldiers.append(Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names)))
 
-        for i in xrange(self.w):
-            self.terrain[i] = dict()
-            for j in xrange(self.h):
-                tree = i != 0 and i != self.w - 1 and random.randrange(3) == 0
-                self.terrain[i][j] = Tile(tree)
+        self.createTerrain()
 
         for s in self.soldiers:
             s.refreshAPs()
+
+    def createTerrain(self):
+        tc = TerrainCreator(self)
+        tc.addRandomForest()
+        tc.addCoastLine(8)
 
     def addListener(self, listener):
         self.listeners.append(listener)
@@ -203,7 +241,10 @@ class Battlefield(object):
     def movementCost(self, x, y):
         if not self.passable(x, y):
             raise InvalidMovementError()
-        return 3
+        if self.terrain[x][y].water:
+            return 7
+        else:
+            return 3
 
     def moveTo(self, x, y):
         self.moveTarget = self.getPath(self.getCurrentSoldier().getPosition(), (x, y))
@@ -234,7 +275,8 @@ class Battlefield(object):
     def updateAI(self):
         self.endTurn()
 
-    def distance(self, a, b):
+    @staticmethod
+    def distance(a, b):
         xd = abs(a[0] - b[0])
         yd = abs(a[1] - b[1])
         return math.sqrt(xd * xd + yd * yd)

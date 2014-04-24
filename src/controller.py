@@ -12,10 +12,15 @@ class ControllerState(object):
         self.movementRequested = False
         self.aiming = 0
         self.message = ''
+        self.pressedKeyCode = 0
+        self.warp = False
 
     def moveCursor(self, x, y):
         self.message = ''
         self.stopAim()
+        if self.warp:
+            x = x * 10
+            y = y * 10
         nx = self.cursorpos[0] + x
         ny = self.cursorpos[1] + y
         nx = min(nx, self.bf.w - 1)
@@ -57,6 +62,7 @@ class Controller(model.BattlefieldListener):
 
     def getInput(self):
         c = self.stdscr.getch()
+        self.state.pressedKeyCode = c
         if c == ord('q'):
             return False
 
@@ -73,6 +79,8 @@ class Controller(model.BattlefieldListener):
                 self.state.moveCursor(-1, 1)
             elif c == 51:
                 self.state.moveCursor(1, 1)
+            elif c == 53:
+                self.state.warp = not self.state.warp
             elif c == 55:
                 self.state.moveCursor(-1, -1)
             elif c == 57:
