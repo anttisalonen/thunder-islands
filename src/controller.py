@@ -91,22 +91,22 @@ class Controller(model.BattlefieldListener):
             elif c == curses.KEY_F2:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 0)
-                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
+                self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F3:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 1)
-                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
+                self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F4:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 2)
-                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
+                self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
             elif c == curses.KEY_F5:
                 self.state.stopAim()
                 self.bf.setCurrentSoldier(0, 3)
-                self.state.message = 'Controlling %s' % self.bf.getCurrentSoldier().getName()
+                self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
             elif c == ord(' '):
                 self.state.stopAim()
-                self.state.message = 'End of turn'
+                self.state.message = 'End of turn...'
                 self.bf.endTurn()
             elif c == ord('f'):
                 self.state.aim()

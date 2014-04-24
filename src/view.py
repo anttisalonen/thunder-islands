@@ -43,12 +43,15 @@ class Path(object):
 class View(object):
     infobarHeight = 8
     statusbarHeight = 2
+    leftPanelWidth = 14
+    rightPanelWidth = 14
+    animDelay = 3
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.bf = model.Battlefield()
         self.path = Path(self.bf, (0,0), (0,0))
-        self.animDelay = 10
+        self.animDelay = View.animDelay
         self.hitPoint = None
         self.screenOffset = 0, 0
 
@@ -85,13 +88,13 @@ class View(object):
 
     def posOnScreen(self, pos):
         cpx, cpy = pos
-        return cpx - self.screenOffset[0], cpy - self.screenOffset[1] + View.statusbarHeight
+        return cpx - self.screenOffset[0] + View.leftPanelWidth, cpy - self.screenOffset[1] + View.statusbarHeight
 
     def cursorPosOnScreen(self):
         return self.posOnScreen(self.controller.state.cursorpos)
 
     def drawTerrain(self):
-        for x in xrange(self.screenOffset[0], min(self.winx + self.screenOffset[0], self.bf.w)):
+        for x in xrange(self.screenOffset[0], min(self.winx - View.leftPanelWidth - View.rightPanelWidth + self.screenOffset[0], self.bf.w)):
             for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
@@ -119,10 +122,11 @@ class View(object):
             msg = ''
         self.stdscr.addstr(0, 0, '%-80s' % msg)
 
-    def drawInfobar(self):
+    def drawSidePanels(self):
         xpos = 0
-        ypos = self.winy - View.infobarHeight
+        ypos = View.statusbarHeight
         currsold = self.bf.getCurrentSoldier()
+        ind = 0
         for sold in self.bf.soldiers:
             if sold.team == 0:
                 if sold == currsold:
@@ -134,29 +138,36 @@ class View(object):
                     self.stdscr.addstr(ypos + 1, xpos, 'APs:    %-4d' % sold.getAPs(), curses.color_pair(color))
                     self.stdscr.addstr(ypos + 2, xpos, 'Health: %-4d' % sold.getHealth(), curses.color_pair(color))
                 else:
-                    self.stdscr.addstr(ypos + 1, xpos, '                ')
-                    self.stdscr.addstr(ypos + 2, xpos, '                ')
-                xpos += 20
+                    assert View.leftPanelWidth == View.rightPanelWidth
+                    self.stdscr.addstr(ypos + 1, xpos, ' ' * View.leftPanelWidth)
+                    self.stdscr.addstr(ypos + 2, xpos, ' ' * View.leftPanelWidth)
+                ypos += 3
+                ind += 1
+                if ind == 2:
+                    xpos = self.winx - View.rightPanelWidth - 1
+                    ypos = View.statusbarHeight
 
-        yoffset = 3
+    def drawInfobar(self):
         xpos = 0
+        ypos = self.winy - View.infobarHeight
+        currsold = self.bf.getCurrentSoldier()
         if currsold.team == 0:
             if self.path.getPath():
                 neededAPs = self.path.getPath()[-1][1]
                 infostr = 'Needed APs: %-4d' % neededAPs
             else:
                 infostr = '                    '
-            self.stdscr.addstr(ypos + yoffset + 0, xpos, infostr)
+            self.stdscr.addstr(ypos + 0, xpos, infostr)
 
             if self.controller.state.aiming != 0:
                 dist = self.bf.distance(currsold.getPosition(), self.controller.state.cursorpos)
                 shootstr = 'Shooting. Aim: %d, distance: %d     ' % (self.controller.state.aiming, dist)
             else:
                 shootstr = ' ' * 40
-            self.stdscr.addstr(ypos + yoffset + 1, xpos, shootstr)
+            self.stdscr.addstr(ypos + 1, xpos, shootstr)
             coordTuple = (self.controller.state.cursorpos[0], self.controller.state.cursorpos[1], self.screenOffset[0], self.screenOffset[1])
-            self.stdscr.addstr(ypos + yoffset + 2, xpos, '(%d, %d) (%d, %d)       ' % coordTuple)
-            self.stdscr.addstr(ypos + yoffset + 3, xpos, '%d  ' % self.controller.state.pressedKeyCode)
+            self.stdscr.addstr(ypos + 2, xpos, '(%d, %d) (%d, %d)       ' % coordTuple)
+            self.stdscr.addstr(ypos + 3, xpos, '%d  ' % self.controller.state.pressedKeyCode)
 
     def drawPath(self):
         if self.bf.shootLine:
@@ -175,7 +186,10 @@ class View(object):
 
     def addch(self, pos, ch, color):
         pos = self.posOnScreen(pos)
-        if pos[1] < self.winy - View.infobarHeight and pos[1] >= View.statusbarHeight and pos[0] >= 0 and pos[0] < self.winx:
+        if pos[1] < self.winy - View.infobarHeight and \
+                pos[1] >= View.statusbarHeight and \
+                pos[0] < self.winx - View.rightPanelWidth and \
+                pos[0] >= View.leftPanelWidth:
             self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color))
 
     def drawBullet(self):
@@ -192,6 +206,7 @@ class View(object):
         self.drawTerrain()
         self.drawPath()
         self.drawBullet()
+        self.drawSidePanels()
         self.drawInfobar()
         self.drawHeader()
         cp = self.cursorPosOnScreen()
@@ -209,7 +224,7 @@ class View(object):
                     self.animDelay -= 1
                 else:
                     self.hitPoint = None
-                    self.animDelay = 10
+                    self.animDelay = View.animDelay
                     if self.bf.moveTarget:
                         if self.bf.updateMovement():
                             self.controller.state.message = 'No more APs to move.'
@@ -225,7 +240,7 @@ class View(object):
 
     def checkScreenScroll(self):
         cp = self.controller.state.cursorpos
-        sx = max(0, self.screenOffset[0], cp[0] - self.winx + 1)
+        sx = max(0, self.screenOffset[0], cp[0] - self.winx + View.leftPanelWidth + 1 + View.rightPanelWidth)
         sx = min(cp[0], sx)
         sy = max(0, self.screenOffset[1], cp[1] - self.winy + View.statusbarHeight + 1 + View.infobarHeight)
         sy = min(cp[1], sy)
