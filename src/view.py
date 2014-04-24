@@ -7,11 +7,12 @@ import model
 import controller
 
 class Path(object):
+    maxDistanceToPath = 100
     def __init__(self, bf, start, end):
         self.bf = bf
         self.start = start
         self.end = end
-        if self.bf.distance(self.start, self.end) < 20:
+        if self.bf.distance(self.start, self.end) < Path.maxDistanceToPath:
             self.path = self.bf.getPath(self.start, self.end)
             self.calcPathCost()
         else:
@@ -34,7 +35,7 @@ class Path(object):
         if start != self.start or end != self.end:
             self.start = start
             self.end = end
-            if self.bf.distance(self.start, self.end) < 20:
+            if self.bf.distance(self.start, self.end) < Path.maxDistanceToPath:
                 self.path = self.bf.getPath(self.start, self.end)
                 self.calcPathCost()
             else:
@@ -69,6 +70,8 @@ class View(object):
         curses.init_pair(6, 7, 1) # path without enough APs, unselected soldier name, bullet
         curses.init_pair(7, 7, 3) # bullet hit
         curses.init_pair(8, 4, 0) # water
+        curses.init_pair(9, 6, 0) # wall
+        curses.init_pair(10, 7, 0) # floor
 
         self.stdscr.leaveok(0)
 
@@ -104,15 +107,21 @@ class View(object):
                         color = 1
                     else:
                         color = 2
-                elif terr.tree:
+                elif terr.overlay == model.Tile.Overlay.Tree:
                     char = 'T'
                     color = 3
-                elif terr.water:
+                elif terr.overlay == model.Tile.Overlay.Wall:
+                    char = '-'
+                    color = 9
+                elif terr.base == model.Tile.Base.Water:
                     char = '~'
                     color = 8
-                else:
+                elif terr.base == model.Tile.Base.Grass:
                     char = '.'
                     color = 4
+                elif terr.base == model.Tile.Base.Floor:
+                    char = '.'
+                    color = 10
                 self.addch((x, y), char, color)
 
     def drawHeader(self):
