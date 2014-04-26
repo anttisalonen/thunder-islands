@@ -236,10 +236,14 @@ class View(object):
         soldier = self.bf.getCurrentSoldier()
         row = 5
         if self.controller.state.showInventory:
-            for k, v in sorted(soldier.getInventory().items()):
-                msg = '%c  %s' % (k, v.getName())
+            if not soldier.getInventory():
+                msg = 'Inventory is empty.'
                 self.stdscr.addstr(row, 30, '%-30s' % msg)
-                row += 1
+            else:
+                for k, v in sorted(soldier.getInventory().items()):
+                    msg = '%c  %s' % (k, v.getName())
+                    self.stdscr.addstr(row, 30, '%-30s' % msg)
+                    row += 1
 
     def addch(self, pos, ch, color, attr = 0):
         pos = self.posOnScreen(pos)

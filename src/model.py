@@ -137,6 +137,17 @@ class Soldier(object):
         if self.attributes.health > 0:
             self.aps = self.attributes.stamina * 25 / 100
 
+    def useAPs(self, cost):
+        if cost > self.aps:
+            return False
+        self.aps -= cost
+        return True
+
+    def pickup(self, item):
+        if not self.useAPs(4):
+            return False
+        return self.addToInventory(item)
+
     def addToInventory(self, item):
         nl = None
         for c in string.ascii_lowercase + string.ascii_uppercase:
@@ -434,11 +445,9 @@ class Battlefield(object):
 
     def shoot(self, x, y, aiming):
         assert aiming > 0 and aiming < 5
-        cost = 10
         sold = self.getCurrentSoldier()
-        if sold.aps < cost:
+        if not sold.useAPs(10):
             return False
-        sold.aps -= cost
 
         soldpos = sold.getPosition()
         shootLine = self.line(soldpos[0], soldpos[1], x, y)
@@ -489,6 +498,10 @@ class Battlefield(object):
 
     def addItem(self, item, position):
         self.items[position].append(item)
+
+    def removeItem(self, item, position):
+        items = self.items[position]
+        items.remove(item)
 
     def itemsAt(self, x, y):
         if (x, y) in self.items:

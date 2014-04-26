@@ -115,6 +115,7 @@ class Controller(model.BattlefieldListener):
                 self.state.aim()
             elif c == ord('F'):
                 self.state.shoot()
+
             elif c == ord('i') or c == ord('d'):
                 self.state.dropping = c == ord('d')
                 self.state.showInventory = True
@@ -132,4 +133,18 @@ class Controller(model.BattlefieldListener):
                             it = soldier.removeFromInventory(chr(c))
                             if it:
                                 self.bf.addItem(it, soldier.getPosition())
+                                self.state.showInventory = False
+                                self.state.message = 'Dropped %s.' % it.getName()
+                                break
+
+            elif c == ord(','):
+                soldier = self.bf.getCurrentSoldier()
+                pos = soldier.getPosition()
+                items = self.bf.itemsAt(pos[0], pos[1])
+                if items:
+                    item = items[0]
+                    char = soldier.pickup(item)
+                    if char:
+                        self.bf.removeItem(item, pos)
+                        self.state.message = '%c - %s.' % (char, item.getName())
 
