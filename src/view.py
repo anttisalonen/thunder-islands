@@ -252,7 +252,8 @@ class View(object):
                         self.hitPoint = self.bf.updateShot()
                         if self.hitPoint:
                             soldierHit = self.hitPoint[2]
-                            self.controller.state.message = 'Hit %s!' % soldierHit.getName()
+                            if soldierHit:
+                                self.controller.state.message = 'Hit %s!' % soldierHit.getName()
             else:
                 curses.curs_set(1)
                 self.running = self.controller.getInput()
