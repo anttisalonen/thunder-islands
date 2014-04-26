@@ -8,12 +8,13 @@ class ControllerState(object):
     def __init__(self, bf):
         self.cursorpos = 5, 5
         self.bf = bf
-        self.freeCursor = False
         self.movementRequested = False
         self.aiming = 0
         self.message = ''
         self.pressedKeyCode = 0
         self.warp = False
+        self.showInventory = False
+        self.running = True
 
     def moveCursor(self, x, y):
         self.message = ''
@@ -46,8 +47,7 @@ class ControllerState(object):
         self.stopAim()
 
 class Controller(model.BattlefieldListener):
-    def __init__(self, bf, stdscr):
-        self.stdscr = stdscr
+    def __init__(self, bf):
         self.bf = bf
         self.state = ControllerState(self.bf)
         self.bf.addListener(self)
@@ -56,17 +56,14 @@ class Controller(model.BattlefieldListener):
         soldier = self.bf.getCurrentSoldier()
         if soldier and soldier.team == 0:
             self.state.cursorpos = soldier.getPosition()
-            self.state.freeCursor = True
-        else:
-            self.state.freeCursor = False
 
     def getInput(self):
-        c = self.stdscr.getch()
-        self.state.pressedKeyCode = c
-        if c == ord('q'):
-            return False
+        while True:
+            c = (yield)
+            self.state.pressedKeyCode = c
+            if c == ord('q'):
+                self.state.running = False
 
-        if self.state.freeCursor:
             if c == curses.KEY_DOWN or c == 50:
                 self.state.moveCursor(0, 1)
             elif c == curses.KEY_UP or c == 56:
@@ -108,9 +105,21 @@ class Controller(model.BattlefieldListener):
                 self.state.stopAim()
                 self.state.message = 'End of turn...'
                 self.bf.endTurn()
+                while True:
+                    c = (yield)
+                    soldier = self.bf.getCurrentSoldier()
+                    if soldier and soldier.team == 0:
+                        self.state.cursorpos = soldier.getPosition()
+                        break
             elif c == ord('f'):
                 self.state.aim()
             elif c == ord('F'):
                 self.state.shoot()
-        return True
+            elif c == ord('i'):
+                self.state.showInventory = True
+                while True:
+                    c = (yield)
+                    if c == ord('i') or c == ord('q'):
+                        self.state.showInventory = False
+                        break
 

@@ -81,11 +81,13 @@ class View(object):
 
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
-        self.controller = controller.Controller(self.bf, self.stdscr)
+        self.controller = controller.Controller(self.bf)
 
+        g = self.controller.getInput()
+        g.next()
         while self.running:
             self.draw()
-            self.getInput()
+            self.getInput(g)
 
         # cleanup
         curses.nocbreak()
@@ -207,6 +209,15 @@ class View(object):
                     color = 6
                 self.addch(p[0], 'x', color)
 
+    def drawOverlay(self):
+        soldier = self.bf.getCurrentSoldier()
+        row = 5
+        if self.controller.state.showInventory:
+            for k, v in sorted(soldier.getInventory().items()):
+                msg = '%c  %s' % (k, v.getName())
+                self.stdscr.addstr(row, 30, '%-30s' % msg)
+                row += 1
+
     def addch(self, pos, ch, color, attr = 0):
         pos = self.posOnScreen(pos)
         if pos[1] < self.winy - View.infobarHeight and \
@@ -232,11 +243,12 @@ class View(object):
         self.drawSidePanels()
         self.drawInfobar()
         self.drawHeader()
+        self.drawOverlay()
         cp = self.cursorPosOnScreen()
         self.stdscr.move(cp[1], cp[0])
         self.stdscr.refresh()
 
-    def getInput(self):
+    def getInput(self, g):
         soldier = self.bf.getCurrentSoldier()
         if soldier.team != 0:
             self.bf.updateAI()
@@ -259,7 +271,9 @@ class View(object):
                                 self.controller.state.message = 'Hit %s!' % soldierHit.getName()
             else:
                 curses.curs_set(1)
-                self.running = self.controller.getInput()
+                c = self.stdscr.getch()
+                g.send(c)
+                self.running = self.controller.state.running
                 self.checkScreenScroll()
 
     def checkScreenScroll(self):

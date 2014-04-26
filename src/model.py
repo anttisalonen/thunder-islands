@@ -4,6 +4,7 @@ import random
 import collections
 import math
 import time
+import string
 
 import astar
 import log
@@ -78,6 +79,40 @@ class Tile(object):
     def passable(self):
         return self.overlay == Tile.Overlay.NoOverlay
 
+class WeaponType(object):
+    Magnum357 = 0
+    RifleG12 = 1
+
+class BulletType(object):
+    Cal357 = 0
+    Gauge12 = 1
+
+class Item(object):
+    def getName(self):
+        raise NotImplementedError('Derived class must implement this')
+
+class Clip(Item):
+    def __init__(self, btype):
+        self.btype = btype
+
+    def getName(self):
+        if self.btype == BulletType.Cal357:
+            return '.357 clip'
+        elif self.btype == BulletType.Gauge12:
+            return '12g clip'
+        assert False
+
+class Weapon(Item):
+    def __init__(self, wtype):
+        self.wtype = wtype
+
+    def getName(self):
+        if self.wtype == WeaponType.Magnum357:
+            return '.357 Magnum'
+        elif self.wtype == WeaponType.RifleG12:
+            return '12g rifle'
+        assert False
+
 def soldierNames():
     names = ['Antti', 'Eppi', 'Purzel', 'Maija', 'Misse', 'Donald', 'Dagobert', 'Mickey', 'Goofy', 'Arnold', 'Bruce', 'Sylvester', 'Renny']
     for n in names:
@@ -104,6 +139,8 @@ class Soldier(object):
         self.team = team
         self.attributes = attributes
         self.aps = 0
+        self.inventory = dict()
+        self.wieldedItem = None
 
     def setPosition(self, pos):
         self.x, self.y = pos[0], pos[1]
@@ -134,6 +171,23 @@ class Soldier(object):
     def refreshAPs(self):
         if self.attributes.health > 0:
             self.aps = self.attributes.stamina * 25 / 100
+
+    def pickup(self, item):
+        nl = None
+        for c in string.ascii_lowercase + string.ascii_uppercase:
+            if c not in self.inventory:
+                nl = c
+                break
+        if not nl:
+            return False
+
+        assert nl not in self.inventory
+        self.inventory[nl] = item
+        if self.wieldedItem is None and isinstance(item, Weapon):
+            self.wieldedItem = nl
+
+    def getInventory(self):
+        return self.inventory
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):
@@ -279,7 +333,17 @@ class Battlefield(object):
             else:
                 x = self.w - 1
 
-            self.soldiers.append(Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names)))
+            if i % 3 != 0:
+                wp = WeaponType.Magnum357
+                bt = BulletType.Cal357
+            else:
+                wp = WeaponType.RifleG12
+                bt = BulletType.Gauge12
+            s = Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names))
+            s.pickup(Weapon(wp))
+            for i in xrange(3):
+                s.pickup(Clip(bt))
+            self.soldiers.append(s)
 
         self.createTerrain()
 
