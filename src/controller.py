@@ -115,11 +115,21 @@ class Controller(model.BattlefieldListener):
                 self.state.aim()
             elif c == ord('F'):
                 self.state.shoot()
-            elif c == ord('i'):
+            elif c == ord('i') or c == ord('d'):
+                self.state.dropping = c == ord('d')
                 self.state.showInventory = True
                 while True:
                     c = (yield)
-                    if c == ord('i') or c == ord('q'):
+                    if not self.state.dropping and (c == ord('i') or c == ord('q') or c == ord(' ') or c == ord('\n')):
                         self.state.showInventory = False
                         break
+                    elif self.state.dropping:
+                        if c == ord(' ') or c == ord('\n'):
+                            self.state.showInventory = False
+                            break
+                        else:
+                            soldier = self.bf.getCurrentSoldier()
+                            it = soldier.removeFromInventory(chr(c))
+                            if it:
+                                self.bf.addItem(it, soldier.getPosition())
 

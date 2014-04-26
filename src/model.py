@@ -12,41 +12,6 @@ import log
 class InvalidMovementError(object):
     pass
 
-class PQueue(object):
-    def __init__(self):
-        self.d = collections.OrderedDict()
-        self.d2 = collections.OrderedDict()
-
-    def push(self, prio, item):
-        self.d[item] = prio
-        try:
-            self.d2[prio].append(item)
-        except KeyError:
-            self.d2[prio] = list()
-            self.d2[prio].append(item)
-
-    def pop(self):
-        itl = self.d2.items()[0][1] # may raise IndexError
-        it = itl.pop()
-        if not itl:
-            del self.d2.items()[0]
-        del self.d[it]
-        return it
-
-    def setPriority(self, prio, item):
-        oldprio = self.d[item]
-        itl = self.d2[oldprio]
-        itl = [x for x in x if x != item]
-        try:
-            self.d2[prio].append(item)
-        except KeyError:
-            self.d2[prio] = list()
-            self.d2[prio].append(item)
-        self.d[item] = prio
-
-    def empty(self):
-        return bool(self.d)
-
 class Tile(object):
     class Base(object):
         Grass = 0
@@ -172,19 +137,29 @@ class Soldier(object):
         if self.attributes.health > 0:
             self.aps = self.attributes.stamina * 25 / 100
 
-    def pickup(self, item):
+    def addToInventory(self, item):
         nl = None
         for c in string.ascii_lowercase + string.ascii_uppercase:
             if c not in self.inventory:
                 nl = c
                 break
         if not nl:
-            return False
+            return None
 
         assert nl not in self.inventory
         self.inventory[nl] = item
         if self.wieldedItem is None and isinstance(item, Weapon):
             self.wieldedItem = nl
+        return nl
+
+    def removeFromInventory(self, char):
+        try:
+            item = self.inventory[char]
+        except KeyError:
+            return None
+        else:
+            del self.inventory[char]
+            return item
 
     def getInventory(self):
         return self.inventory
@@ -325,6 +300,8 @@ class Battlefield(object):
         self.shootLine = None
         self.currentSoldierIndex = 0
 
+        self.items = collections.defaultdict(list)
+
         names = soldierNames()
         for i in xrange(8):
             t = i % 2
@@ -340,9 +317,9 @@ class Battlefield(object):
                 wp = WeaponType.RifleG12
                 bt = BulletType.Gauge12
             s = Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names))
-            s.pickup(Weapon(wp))
+            s.addToInventory(Weapon(wp))
             for i in xrange(3):
-                s.pickup(Clip(bt))
+                s.addToInventory(Clip(bt))
             self.soldiers.append(s)
 
         self.createTerrain()
@@ -509,6 +486,15 @@ class Battlefield(object):
             if e2 < dx:
                 err = err + dx
                 y0 = y0 + sy
+
+    def addItem(self, item, position):
+        self.items[position].append(item)
+
+    def itemsAt(self, x, y):
+        if (x, y) in self.items:
+            return self.items[(x, y)]
+        else:
+            return list()
 
 def main():
     bf = Battlefield()

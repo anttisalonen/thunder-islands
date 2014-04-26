@@ -107,6 +107,7 @@ class View(object):
             for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
+                items = self.bf.itemsAt(x, y)
                 attr = 0
                 if sold:
                     char = '@'
@@ -114,6 +115,10 @@ class View(object):
                         color = 1
                     else:
                         color = 2
+                elif items:
+                    item = items[0]
+                    char, color, attr = self.itemDisplay(item)
+                    self.addch((x, y), char, color, attr)
                 elif terr.overlay == model.Tile.Overlay.Tree:
                     char = 'T'
                     color = 3
@@ -139,6 +144,24 @@ class View(object):
                 else:
                     assert False, 'Can\'t display base %d, overlay %d' % (terr.base, terr.overlay)
                 self.addch((x, y), char, color, attr)
+
+    @staticmethod
+    def itemDisplay(item):
+        if isinstance(item, model.Weapon):
+            char = '&'
+            if item.wtype == model.WeaponType.Magnum357:
+                return char, 245, 0
+            elif item.wtype == model.WeaponType.RifleG12:
+                return char, 161, 0
+            assert False
+        elif isinstance(item, model.Clip):
+            char = 'c'
+            if item.btype == model.WeaponType.Magnum357:
+                return char, 245, 0
+            elif item.btype == model.WeaponType.RifleG12:
+                return char, 161, 0
+            assert False
+        assert False, '%s' % item
 
     def drawHeader(self):
         if self.controller.state.message:
