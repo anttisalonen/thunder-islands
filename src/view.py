@@ -3,12 +3,13 @@
 import curses
 import time
 import os
+import argparse
 
 import model
 import controller
 
 class Path(object):
-    maxDistanceToPath = 100
+    maxDistanceToPath = 20
     def __init__(self, bf, start, end):
         self.bf = bf
         self.start = start
@@ -49,9 +50,9 @@ class View(object):
     rightPanelWidth = 14
     animDelay = 3
 
-    def __init__(self, stdscr):
+    def __init__(self, stdscr, seed):
         self.stdscr = stdscr
-        self.bf = model.Battlefield()
+        self.bf = model.Battlefield(seed)
         self.path = Path(self.bf, (0,0), (0,0))
         self.animDelay = View.animDelay
         self.hitPoint = None
@@ -104,6 +105,7 @@ class View(object):
             for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 sold = self.bf.soldierAt(x, y)
+                attr = 0
                 if sold:
                     char = '@'
                     if sold.team == 0:
@@ -114,8 +116,9 @@ class View(object):
                     char = 'T'
                     color = 3
                 elif terr.overlay == model.Tile.Overlay.Wall:
-                    char = '-'
+                    char = 'w'
                     color = 9
+                    attr = curses.A_BOLD
                 elif terr.base == model.Tile.Base.Water:
                     char = '~'
                     color = 8
@@ -133,7 +136,7 @@ class View(object):
                     color = 122
                 else:
                     assert False, 'Can\'t display base %d, overlay %d' % (terr.base, terr.overlay)
-                self.addch((x, y), char, color)
+                self.addch((x, y), char, color, attr)
 
     def drawHeader(self):
         if self.controller.state.message:
@@ -204,13 +207,13 @@ class View(object):
                     color = 6
                 self.addch(p[0], 'x', color)
 
-    def addch(self, pos, ch, color):
+    def addch(self, pos, ch, color, attr = 0):
         pos = self.posOnScreen(pos)
         if pos[1] < self.winy - View.infobarHeight and \
                 pos[1] >= View.statusbarHeight and \
                 pos[0] < self.winx - View.rightPanelWidth and \
                 pos[0] >= View.leftPanelWidth:
-            self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color))
+            self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color) | attr)
 
     def drawBullet(self):
         if self.hitPoint:
@@ -267,11 +270,15 @@ class View(object):
         sy = min(cp[1], sy)
         self.screenOffset = sx, sy
 
-def main(stdscr):
-    view = View(stdscr)
+def main(stdscr, seed):
+    view = View(stdscr, seed)
     view.run()
 
 if __name__ == '__main__':
     os.environ['TERM'] = 'xterm-256color'
-    curses.wrapper(main)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--seed', help='random seed', type=int)
+    args = parser.parse_args()
+    curses.wrapper(lambda stdscr: main(stdscr, args.seed))
 
