@@ -98,6 +98,8 @@ def getSoldierAttributes(enemy, names):
         return SoldierAttributes(names.next(), stamina, health)
 
 class Soldier(object):
+    APsToPickup = 4
+
     def __init__(self, x, y, team, attributes):
         self.x = x
         self.y = y
@@ -144,7 +146,7 @@ class Soldier(object):
         return True
 
     def pickup(self, item):
-        if not self.useAPs(4):
+        if not self.useAPs(Soldier.APsToPickup):
             return False
         return self.addToInventory(item)
 
@@ -176,6 +178,9 @@ class Soldier(object):
 
     def getInventory(self):
         return self.inventory
+
+    def hasAPsToPickup(self):
+        return self.aps >= Soldier.APsToPickup
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):

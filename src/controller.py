@@ -1,6 +1,7 @@
 #!/usr/bin/env python2.7
 
 import curses
+import string
 
 import model
 
@@ -14,6 +15,7 @@ class ControllerState(object):
         self.pressedKeyCode = 0
         self.warp = False
         self.showInventory = False
+        self.showPickupMenu = False
         self.running = True
 
     def moveCursor(self, x, y):
@@ -121,30 +123,53 @@ class Controller(model.BattlefieldListener):
                 self.state.showInventory = True
                 while True:
                     c = (yield)
-                    if not self.state.dropping and (c == ord('i') or c == ord('q') or c == ord(' ') or c == ord('\n')):
+                    if not self.state.dropping and (c == ord('i') or c == ord('q') or self.exitItemMenu(c)):
                         self.state.showInventory = False
                         break
                     elif self.state.dropping:
-                        if c == ord(' ') or c == ord('\n'):
-                            self.state.showInventory = False
+                        if self.exitItemMenu(c):
                             break
                         else:
                             soldier = self.bf.getCurrentSoldier()
                             it = soldier.removeFromInventory(chr(c))
                             if it:
                                 self.bf.addItem(it, soldier.getPosition())
-                                self.state.showInventory = False
                                 self.state.message = 'Dropped %s.' % it.getName()
                                 break
+                self.state.showInventory = False
 
             elif c == ord(','):
                 soldier = self.bf.getCurrentSoldier()
-                pos = soldier.getPosition()
-                items = self.bf.itemsAt(pos[0], pos[1])
-                if items:
-                    item = items[0]
-                    char = soldier.pickup(item)
-                    if char:
-                        self.bf.removeItem(item, pos)
-                        self.state.message = '%c - %s.' % (char, item.getName())
+                if soldier.hasAPsToPickup():
+                    pos = soldier.getPosition()
+                    items = self.bf.itemsAt(pos[0], pos[1])
+                    if items:
+                        if len(items) > 1:
+                            self.state.message = 'Select item to pick up.'
+                            self.state.showPickupMenu = True
+                            self.state.itemMenu = dict(zip(string.ascii_lowercase, items))
+                            c = (yield)
+                            try:
+                                item = self.state.itemMenu[chr(c)]
+                            except KeyError:
+                                pass
+                            else:
+                                self.pickup(item)
+                            self.state.showPickupMenu = False
+                        else:
+                            self.pickup(items[0])
+                else:
+                    self.state.message = 'Not enough APs to pick up an item.'
+
+    def pickup(self, item):
+        soldier = self.bf.getCurrentSoldier()
+        pos = soldier.getPosition()
+        char = soldier.pickup(item)
+        if char:
+            self.bf.removeItem(item, pos)
+            self.state.message = '%c - %s.' % (char, item.getName())
+
+    def exitItemMenu(self, c):
+        return c == ord(' ') or c == ord('\n')
+
 
