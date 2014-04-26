@@ -170,6 +170,8 @@ class Soldier(object):
             return None
         else:
             del self.inventory[char]
+            if self.wieldedItem == char:
+                self.wieldedItem = None
             return item
 
     def getInventory(self):

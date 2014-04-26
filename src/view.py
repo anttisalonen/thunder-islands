@@ -241,7 +241,7 @@ class View(object):
                 self.stdscr.addstr(row, 30, '%-30s' % msg)
             else:
                 for k, v in sorted(soldier.getInventory().items()):
-                    msg = '%c  %s' % (k, v.getName())
+                    msg = '%c  %s%s' % (k, v.getName(), ' (wielded)' if k == soldier.wieldedItem else '')
                     self.stdscr.addstr(row, 30, '%-30s' % msg)
                     row += 1
 
