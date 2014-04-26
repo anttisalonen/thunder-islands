@@ -3,8 +3,10 @@
 import random
 import collections
 import math
+import time
 
 import astar
+import log
 
 class InvalidMovementError(object):
     pass
@@ -49,6 +51,7 @@ class Tile(object):
         Grass = 0
         Water = 1
         Floor = 2
+        Pathway = 3
 
     class Overlay(object):
         NoOverlay = 0
@@ -67,6 +70,8 @@ class Tile(object):
         elif self.base == Tile.Base.Water:
             return 7
         elif self.base == Tile.Base.Floor:
+            return 2
+        elif self.base == Tile.Base.Pathway:
             return 2
         assert False
 
@@ -137,6 +142,7 @@ class BattlefieldListener(object):
 class TerrainCreator(object):
     def __init__(self, bf):
         self.bf = bf
+        self.doorways = list()
         for i in xrange(self.bf.w):
             self.bf.terrain[i] = dict()
             for j in xrange(self.bf.h):
@@ -193,13 +199,13 @@ class TerrainCreator(object):
             # not in water:
             # create walls
             for i in xrange(hx, hx + hwidth + 1):
-                self.bf.terrain[i][hy] = Tile(Tile.Base.Grass, Tile.Overlay.Wall)
+                self.bf.terrain[i][hy] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
             for i in xrange(hx, hx + hwidth + 1):
-                self.bf.terrain[i][hy + hheight] = Tile(Tile.Base.Grass, Tile.Overlay.Wall)
+                self.bf.terrain[i][hy + hheight] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
             for i in xrange(hy, hy + hheight + 1):
-                self.bf.terrain[hx][i] = Tile(Tile.Base.Grass, Tile.Overlay.Wall)
+                self.bf.terrain[hx][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
             for i in xrange(hy, hy + hheight + 1):
-                self.bf.terrain[hx + hwidth][i] = Tile(Tile.Base.Grass, Tile.Overlay.Wall)
+                self.bf.terrain[hx + hwidth][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
 
             # create floor
             for i in xrange(hx + 1, hx + hwidth):
@@ -228,11 +234,33 @@ class TerrainCreator(object):
                     if self.bf.terrain[i][j].overlay == Tile.Overlay.Tree:
                         self.bf.terrain[i][j].overlay = Tile.Overlay.NoOverlay
 
+            self.doorways.append((dx, dy))
             return
 
+    def addPaths(self):
+        for i in self.doorways:
+            for j in self.doorways:
+                if i <= j:
+                    continue
+                path = self.bf.getPath(i, j)
+                assert path
+                if path:
+                    for p in path:
+                        if self.bf.terrain[p[0]][p[1]].base == Tile.Base.Pathway:
+                            coords = [p]
+                        else:
+                            coords = [p, (p[0] - 1, p[1]), (p[0], p[1] - 1), (p[0] + 1, p[1]), (p[0], p[1] + 1)]
+                        for cx, cy in coords:
+                            if cx >= 0 and cy >= 0 and cx < self.bf.w and cy < self.bf.h:
+                                if self.bf.terrain[cx][cy].base == Tile.Base.Grass:
+                                    self.bf.terrain[cx][cy] = Tile(Tile.Base.Pathway, Tile.Overlay.NoOverlay)
+
 class Battlefield(object):
-    def __init__(self):
-        random.seed(21)
+    def __init__(self, seed = None):
+        if seed is None:
+            seed = int(time.time())
+        random.seed(seed)
+        log.log('Random seed: %d' % seed)
 
         self.w = 80
         self.h = 40
@@ -264,6 +292,7 @@ class Battlefield(object):
         tc.addCoastLine(8)
         for i in xrange(3):
             tc.addHouse()
+        tc.addPaths()
 
     def addListener(self, listener):
         self.listeners.append(listener)

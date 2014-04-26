@@ -2,6 +2,7 @@
 
 import curses
 import time
+import os
 
 import model
 import controller
@@ -62,6 +63,8 @@ class View(object):
         self.stdscr.keypad(1)
         curses.start_color()
         curses.use_default_colors()
+        for i in range(0, curses.COLORS):
+            curses.init_pair(i + 1, i, -1)
         curses.init_pair(1, 1, 7) # soldier team 1
         curses.init_pair(2, 4, 7) # soldier team 2
         curses.init_pair(3, 2, 0) # tree
@@ -119,9 +122,17 @@ class View(object):
                 elif terr.base == model.Tile.Base.Grass:
                     char = '.'
                     color = 4
+                elif terr.base == model.Tile.Base.Grass:
+                    char = '.'
+                    color = 4
                 elif terr.base == model.Tile.Base.Floor:
                     char = '.'
                     color = 10
+                elif terr.base == model.Tile.Base.Pathway:
+                    char = '+'
+                    color = 122
+                else:
+                    assert False, 'Can\'t display base %d, overlay %d' % (terr.base, terr.overlay)
                 self.addch((x, y), char, color)
 
     def drawHeader(self):
@@ -260,5 +271,6 @@ def main(stdscr):
     view.run()
 
 if __name__ == '__main__':
+    os.environ['TERM'] = 'xterm-256color'
     curses.wrapper(main)
 
