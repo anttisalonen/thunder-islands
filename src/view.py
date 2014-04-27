@@ -355,6 +355,9 @@ class View(object):
                 c = self.stdscr.getch()
                 g.send(c)
                 self.running = self.controller.state.running
+                if self.controller.state.droppedItem is not None:
+                    self.reportedItems.add(self.controller.state.droppedItem)
+                    self.controller.state.droppedItem = None
                 self.checkScreenScroll()
 
     def mainWindowWidth(self):

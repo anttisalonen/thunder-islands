@@ -20,6 +20,7 @@ class ControllerState(object):
         self.currentSoldierIndex = 0
         self.soldierCursorPos = dict()
         self.center = False
+        self.droppedItem = None
 
     def moveCursor(self, x, y):
         self.message = ''
@@ -125,6 +126,7 @@ class Controller(model.BattlefieldListener):
                             if it:
                                 self.bf.addItem(it, soldier.getPosition())
                                 self.state.message = 'Dropped %s.' % it.getName()
+                                self.state.droppedItem = it
                                 break
                 self.state.showInventory = False
 
