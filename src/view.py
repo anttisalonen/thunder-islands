@@ -312,7 +312,8 @@ class View(object):
     def getInput(self, g):
         soldier = self.bf.getCurrentSoldier()
         if soldier.team != 0:
-            self.bf.updateAI()
+            if self.bf.updateAI():
+                self.state.message = 'Sector lost!'
         else:
             if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
                 curses.curs_set(0)

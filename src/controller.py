@@ -17,7 +17,7 @@ class ControllerState(object):
         self.showInventory = False
         self.showPickupMenu = False
         self.running = True
-        self.currentSoldierIndex = 0
+        self.currentSoldier = None
         self.soldierCursorPos = dict()
         self.center = False
         self.droppedItem = None
@@ -57,10 +57,12 @@ class Controller(model.BattlefieldListener):
         self.bf = bf
         self.state = ControllerState(self.bf)
         self.bf.addListener(self)
+        self.mySoldiers = [s for s in self.bf.soldiers if s.team == 0]
+        self.state.currentSoldier = self.mySoldiers[0]
 
     def turnEnded(self, currentTeam):
         if currentTeam == 0:
-            self.bf.setCurrentSoldier(0, self.state.currentSoldierIndex)
+            self.bf.setCurrentSoldier(self.state.currentSoldier)
 
     def getInput(self):
         while True:
@@ -90,20 +92,24 @@ class Controller(model.BattlefieldListener):
             elif c == 10 or c == 13 or c == curses.KEY_ENTER:
                 self.state.stopAim()
                 self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
-                self.state.soldierCursorPos[self.state.currentSoldierIndex] = self.state.cursorpos
+                self.state.soldierCursorPos[self.state.currentSoldier] = self.state.cursorpos
             elif c >= curses.KEY_F2 and c <= curses.KEY_F5:
                 self.state.stopAim()
-                self.state.currentSoldierIndex = c - curses.KEY_F2
-                self.bf.setCurrentSoldier(0, self.state.currentSoldierIndex)
+                soldIndex = c - curses.KEY_F2
+                sold = self.mySoldiers[soldIndex]
+                if sold.alive():
+                    self.bf.setCurrentSoldier(sold)
+                    self.state.currentSoldier = sold
                 try:
-                    self.state.cursorpos = self.state.soldierCursorPos[self.state.currentSoldierIndex]
+                    self.state.cursorpos = self.state.soldierCursorPos[self.state.currentSoldier]
                 except KeyError:
                     self.state.cursorpos = self.bf.getCurrentSoldier().getPosition()
                 self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
             elif c == ord(' '):
                 self.state.stopAim()
                 self.state.message = 'End of turn...'
-                self.bf.endTurn()
+                if self.bf.endTurn():
+                    self.state.message = 'Sector won!'
             elif c == ord('f'):
                 self.state.aim()
             elif c == ord('F'):

@@ -332,7 +332,7 @@ class Battlefield(object):
         self.moveTarget = None
         self.shootLine = None
         self.shotDistance = None
-        self.currentSoldierIndex = 0
+        self.currentSoldier = None
 
         self.items = collections.defaultdict(list)
 
@@ -342,7 +342,7 @@ class Battlefield(object):
             if t == 0:
                 x = 0
             else:
-                x = self.w - 1
+                x = 30
 
             if i % 3 != 0:
                 wp = WeaponType.Magnum357
@@ -351,6 +351,8 @@ class Battlefield(object):
                 wp = WeaponType.RifleG12
                 bt = BulletType.Gauge12
             s = Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names))
+            if i == 0:
+                self.setCurrentSoldier(s)
             s.addToInventory(Weapon(wp))
             for i in xrange(3):
                 s.addToInventory(Clip(bt))
@@ -380,21 +382,10 @@ class Battlefield(object):
         return None
 
     def getCurrentSoldier(self):
-        return self.soldiers[self.currentSoldierIndex]
+        return self.currentSoldier
 
-    def setCurrentSoldier(self, team, number):
-        thisNum = 0
-        thisIndex = 0
-        for sold in self.soldiers:
-            if sold.team == team:
-                if thisNum == number:
-                    if sold.alive():
-                        self.currentSoldierIndex = thisIndex
-                        for l in self.listeners:
-                            l.currentSoldierChanged()
-                    return
-                thisNum += 1
-            thisIndex += 1
+    def setCurrentSoldier(self, soldier):
+        self.currentSoldier = soldier
 
     def getPath(self, start, end):
         if not self.passable(end[0], end[1]):
@@ -456,17 +447,52 @@ class Battlefield(object):
         return None, newSoldiersSeen, newItemsSeen
 
     def endTurn(self):
+        self.moveTarget = None
+        assert self.shootLine is None or self.shootLine == list()
         currentTeam = self.getCurrentSoldier().team
         nextTeam = 1 if currentTeam == 0 else 0
+        prevCurrentSoldier = self.getCurrentSoldier()
         if nextTeam == 0:
             for s in self.soldiers:
                 s.refreshAPs()
-        self.setCurrentSoldier(nextTeam, 0)
+
+        self.currentSoldier = None
+        for s in self.soldiers:
+            if s.alive() and self.currentSoldier is None and s.team == nextTeam:
+                self.currentSoldier = s
+                break
+        if not self.currentSoldier:
+            self.currentSoldier = prevCurrentSoldier
+            return True
+        assert self.currentSoldier is not None
+
+        assert currentTeam != nextTeam
         for l in self.listeners:
             l.turnEnded(nextTeam)
+        return False
+
+    def findNearbyObstacles(self, soldier, enemy):
+        return [(5, 5)]
 
     def updateAI(self):
-        self.endTurn()
+        currTeam = self.getCurrentSoldier().team
+        assert currTeam == 1
+        for s in [s for s in self.soldiers if s.alive() and s.team == currTeam]:
+            self.setCurrentSoldier(s)
+            enemies = self.enemySoldiersSeenBySoldier(s)
+            if enemies:
+                enemy = enemies[0]
+                obstacles = self.findNearbyObstacles(s, enemy)
+                if obstacles:
+                    obstacle = obstacles[0]
+                    self.moveTo(obstacle[0], obstacle[1])
+                    if self.moveTarget:
+                        while True:
+                            noaps, newSoldiers, newItems = self.updateMovement()
+                            if noaps or newSoldiers or noaps == False:
+                                self.moveTarget = None
+                                break
+        return self.endTurn()
 
     @staticmethod
     def distance(a, b):
