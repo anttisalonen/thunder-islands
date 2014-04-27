@@ -99,6 +99,7 @@ def getSoldierAttributes(enemy, names):
 
 class Soldier(object):
     APsToPickup = 4
+    MaxAPs = 25
 
     def __init__(self, x, y, team, attributes):
         self.x = x
@@ -137,7 +138,7 @@ class Soldier(object):
 
     def refreshAPs(self):
         if self.attributes.health > 0:
-            self.aps = self.attributes.stamina * 25 / 100
+            self.aps = self.attributes.stamina * Soldier.MaxAPs / 100
 
     def useAPs(self, cost):
         if cost > self.aps:
@@ -184,6 +185,9 @@ class Soldier(object):
 
 class BattlefieldListener(object):
     def currentSoldierChanged(self):
+        pass
+
+    def turnEnded(self, currentTeam):
         pass
 
 class TerrainCreator(object):
@@ -364,7 +368,6 @@ class Battlefield(object):
 
     def addListener(self, listener):
         self.listeners.append(listener)
-        listener.currentSoldierChanged()
 
     def soldierAt(self, x, y):
         for s in self.soldiers:
@@ -449,6 +452,8 @@ class Battlefield(object):
             for s in self.soldiers:
                 s.refreshAPs()
         self.setCurrentSoldier(nextTeam, 0)
+        for l in self.listeners:
+            l.turnEnded(nextTeam)
 
     def updateAI(self):
         self.endTurn()

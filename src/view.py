@@ -7,18 +7,15 @@ import argparse
 
 import model
 import controller
+import log
 
 class Path(object):
-    maxDistanceToPath = 20
     def __init__(self, bf, start, end):
         self.bf = bf
         self.start = start
         self.end = end
-        if self.bf.distance(self.start, self.end) < Path.maxDistanceToPath:
-            self.path = self.bf.getPath(self.start, self.end)
-            self.calcPathCost()
-        else:
-            self.path = None
+        self.path = self.bf.getPath(self.start, self.end)
+        self.calcPathCost()
 
     def calcPathCost(self):
         path_cost = None
@@ -37,11 +34,8 @@ class Path(object):
         if start != self.start or end != self.end:
             self.start = start
             self.end = end
-            if self.bf.distance(self.start, self.end) < Path.maxDistanceToPath:
-                self.path = self.bf.getPath(self.start, self.end)
-                self.calcPathCost()
-            else:
-                self.path = None
+            self.path = self.bf.getPath(self.start, self.end)
+            self.calcPathCost()
 
 class View(object):
     infobarHeight = 8
@@ -66,8 +60,8 @@ class View(object):
         curses.use_default_colors()
         for i in range(0, curses.COLORS):
             curses.init_pair(i + 1, i, -1)
-        curses.init_pair(1, 1, 7) # soldier team 1
-        curses.init_pair(2, 4, 7) # soldier team 2
+        curses.init_pair(1, 33, 0) # soldier team 1
+        curses.init_pair(2, 1, 7) # soldier team 2
         curses.init_pair(3, 2, 0) # tree
         curses.init_pair(4, 3, 0) # grass
         curses.init_pair(5, 7, 0) # path with enough APs, selected soldier name
@@ -76,12 +70,14 @@ class View(object):
         curses.init_pair(8, 4, 0) # water
         curses.init_pair(9, 6, 0) # wall
         curses.init_pair(10, 7, 0) # floor
+        curses.init_pair(11, 33, 7) # soldier team 1, selected
 
         self.stdscr.leaveok(0)
 
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
         self.controller = controller.Controller(self.bf)
+        self.controller.state.cursorpos = self.bf.getCurrentSoldier().getPosition()
 
         g = self.controller.getInput()
         g.next()
@@ -112,7 +108,10 @@ class View(object):
                 if sold:
                     char = '@'
                     if sold.team == 0:
-                        color = 1
+                        if sold == self.bf.getCurrentSoldier():
+                            color = 11
+                        else:
+                            color = 1
                     else:
                         color = 2
                 elif items:
