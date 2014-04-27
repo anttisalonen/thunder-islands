@@ -2,6 +2,7 @@
 
 from heapq import heappush, heappop
 import sys
+import math
 
 def solve(graphfunc, costfunc, heurfunc, goaltestfunc, start):
     visited = set()
@@ -96,6 +97,14 @@ def main():
 
 def simplifyCostFunc(costfunc):
     return lambda x, y: costfunc(y)
+
+def euclidHeuristics(goal):
+    return lambda x: euclidDistance(x, goal)
+
+def euclidDistance(a, b):
+    dx = a[0] - b[0]
+    dy = a[1] - b[1]
+    return math.sqrt(dx * dx + dy * dy)
 
 def manhattanHeuristics(goal):
     return lambda x: abs(goal[0] - x[0]) + abs(goal[1] - x[1])

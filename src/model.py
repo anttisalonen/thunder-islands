@@ -371,7 +371,7 @@ class Battlefield(object):
 
     def soldierAt(self, x, y):
         for s in self.soldiers:
-            if s.alive() and s.x == x and s.y == y:
+            if s.x == x and s.y == y and s.alive():
                 return s
         return None
 
@@ -398,31 +398,26 @@ class Battlefield(object):
 
         def neighbours(v):
             ret = list()
-            for i in xrange(-1, 2):
-                for j in xrange(-1, 2):
-                    if i == 0 and j == 0:
-                        continue
-                    nx = v[0] + i
-                    ny = v[1] + j
-                    if nx < 0 or ny < 0 or nx >= self.w or ny >= self.h:
-                        continue
-                    if self.passable(nx, ny):
-                        ret.append((nx, ny))
+            for i, j in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]:
+                nx = v[0] + i
+                ny = v[1] + j
+                if nx < 0 or ny < 0 or nx >= self.w or ny >= self.h:
+                    continue
+                if self.passable(nx, ny):
+                    ret.append((nx, ny))
             return ret
 
         def costfunc(n1, n2):
             return self.movementCost(n2[0], n2[1])
 
-        path = astar.solve(neighbours, costfunc, astar.manhattanHeuristics(end),
+        path = astar.solve(neighbours, costfunc, astar.euclidHeuristics(end),
                 astar.makeGoalFunc(end), start)
         return path
 
     def passable(self, x, y):
         if not self.terrain[x][y].passable():
             return False
-        if self.soldierAt(x, y) != None:
-            return False
-        return True
+        return self.soldierAt(x, y) == None
 
     def movementCost(self, x, y):
         return self.terrain[x][y].movementCost()
