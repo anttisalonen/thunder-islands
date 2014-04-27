@@ -331,6 +331,7 @@ class Battlefield(object):
         self.listeners = list()
         self.moveTarget = None
         self.shootLine = None
+        self.shotDistance = None
         self.currentSoldierIndex = 0
 
         self.items = collections.defaultdict(list)
@@ -482,19 +483,42 @@ class Battlefield(object):
         soldpos = sold.getPosition()
         shootLine = self.line(soldpos[0], soldpos[1], x, y)
         self.shootLine = shootLine[1:10]
+        self.shotDistance = 0
         return True
 
     def updateShot(self):
         shotpos = self.shootLine.pop(0)
+        self.shotDistance += 1
         x, y = shotpos[0]
-        hit = self.soldierAt(x, y)
+        soldierToHit = self.soldierAt(x, y)
+        hit = None
+        if soldierToHit:
+            prob = 1.0 - self.shotDistance * 0.05 # TODO: weapon and shooter dependent
+            didHit = random.uniform(0, 1) < prob
+            if didHit:
+                hit = soldierToHit
         if hit:
             self.shootLine = None
-            hit.decreaseHealth(40)
+            hit.decreaseHealth(40) # TODO: weapon and shooter dependent
             return x, y, hit
-        if not self.terrain[x][y].passable():
-            self.shootLine = None
-            return x, y, None
+        else:
+            ol = self.terrain[x][y].overlay
+            if self.shotDistance > 10: # TODO: weapon dependent
+                self.shootLine = None
+                return x, y, None
+            elif ol == Tile.Overlay.NoOverlay:
+                return None
+            elif ol == Tile.Overlay.Tree:
+                blockProb = (self.shotDistance - 1) * 0.1
+            elif ol == Tile.Overlay.Wall:
+                blockProb = 1.0
+            else:
+                assert False, 'No blocking information for %d' % ol
+            if random.uniform(0, 1) < blockProb:
+                self.shootLine = None
+                return x, y, None
+            else:
+                return None
 
     def line(self, x0, y0, x1, y1):
         # Bresenham
