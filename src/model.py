@@ -137,8 +137,11 @@ class Soldier(object):
         return self.aps
 
     def refreshAPs(self):
+        restAPs = self.aps
         if self.attributes.health > 0:
             self.aps = self.attributes.stamina * Soldier.MaxAPs / 100
+            self.aps += min(5, restAPs)
+            self.aps = min(Soldier.MaxAPs, self.aps)
 
     def useAPs(self, cost):
         if cost > self.aps:
