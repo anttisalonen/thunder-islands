@@ -521,12 +521,48 @@ class Battlefield(object):
     def removeItem(self, item, position):
         items = self.items[position]
         items.remove(item)
+        if len(items) == 0:
+            del self.items[position]
 
     def itemsAt(self, x, y):
         if (x, y) in self.items:
             return self.items[(x, y)]
         else:
             return list()
+
+    def itemsSeenByTeam(self, teamnum):
+        ret = dict()
+        slist = [s for s in self.soldiers if s.team == teamnum]
+        for pos, items in self.items.items():
+            for s in slist:
+                if self.visibilityTo(s, pos) > 0.0:
+                    ret[pos] = items
+                    break
+        return ret
+
+    def soldierSeenByTeam(self, teamnum, soldier):
+        pos = soldier.getPosition()
+        for s in self.soldiers:
+            if s.team == teamnum and self.visibilityTo(s, pos) > 0.0:
+                return True
+        return False
+
+    def visibilityTo(self, soldier, position):
+        spos = soldier.getPosition()
+        line = self.line(spos[0], spos[1], position[0], position[1])[1:-1]
+        visibility = 1.0
+        for (lx, ly), e in line:
+            ol = self.terrain[lx][ly].overlay
+            if ol == Tile.Overlay.NoOverlay:
+                drop = 0.05
+            elif ol == Tile.Overlay.Tree:
+                drop = 0.35
+            elif ol == Tile.Overlay.Wall:
+                drop = 1.0
+            else:
+                assert False, 'No visibility information for %d' % ol
+            visibility -= drop
+        return visibility
 
 def main():
     bf = Battlefield()

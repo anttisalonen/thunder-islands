@@ -112,27 +112,32 @@ class View(object):
         sy = max(0, min(self.bf.h - self.mainWindowHeight() - 1, sy))
         self.screenOffset = sx, sy
 
+    def drawItems(self):
+        for pos, items in self.bf.itemsSeenByTeam(0).items():
+            item = items[0]
+            char, color, attr = self.itemDisplay(item)
+            self.addch(pos, char, color, attr)
+
+    def drawPeople(self):
+        for sold in self.bf.soldiers:
+            char = '@'
+            if sold.team == 0:
+                if sold == self.bf.getCurrentSoldier():
+                    color = 11
+                else:
+                    color = 1
+            elif self.bf.soldierSeenByTeam(0, sold):
+                color = 2
+            else:
+                continue
+            self.addch(sold.getPosition(), char, color, 0)
+
     def drawTerrain(self):
         for x in xrange(self.screenOffset[0], min(self.winx - View.leftPanelWidth - View.rightPanelWidth + self.screenOffset[0], self.bf.w)):
             for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
                 terr = self.bf.terrain[x][y]
-                sold = self.bf.soldierAt(x, y)
-                items = self.bf.itemsAt(x, y)
                 attr = 0
-                if sold:
-                    char = '@'
-                    if sold.team == 0:
-                        if sold == self.bf.getCurrentSoldier():
-                            color = 11
-                        else:
-                            color = 1
-                    else:
-                        color = 2
-                elif items:
-                    item = items[0]
-                    char, color, attr = self.itemDisplay(item)
-                    self.addch((x, y), char, color, attr)
-                elif terr.overlay == model.Tile.Overlay.Tree:
+                if terr.overlay == model.Tile.Overlay.Tree:
                     char = 'T'
                     color = 3
                 elif terr.overlay == model.Tile.Overlay.Wall:
@@ -288,6 +293,8 @@ class View(object):
     def draw(self):
         self.checkCenter()
         self.drawTerrain()
+        self.drawItems()
+        self.drawPeople()
         self.drawPath()
         self.drawBullet()
         self.drawSidePanels()
