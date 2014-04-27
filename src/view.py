@@ -241,17 +241,18 @@ class View(object):
             if not inv:
                 msg = 'Inventory is empty.'
                 self.stdscr.addstr(row, 30, '%-30s' % msg)
-                return
+                return True
         elif self.controller.state.showPickupMenu:
             inv = self.controller.state.itemMenu
             showInv = False
         else:
-            return
+            return False
 
         for k, v in sorted(inv.items()):
             msg = '%c  %s%s' % (k, v.getName(), ' (wielded)' if showInv and k == soldier.wieldedItem else '')
             self.stdscr.addstr(row, 30, '%-30s' % msg)
             row += 1
+        return True
 
     def addch(self, pos, ch, color, attr = 0):
         pos = self.posOnScreen(pos)
@@ -278,9 +279,9 @@ class View(object):
         self.drawSidePanels()
         self.drawInfobar()
         self.drawHeader()
-        self.drawOverlay()
-        cp = self.cursorPosOnScreen()
-        self.stdscr.move(cp[1], cp[0])
+        if not self.drawOverlay():
+            cp = self.cursorPosOnScreen()
+            self.stdscr.move(cp[1], cp[0])
         self.stdscr.refresh()
 
     def getInput(self, g):
