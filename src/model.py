@@ -302,6 +302,14 @@ class TerrainCreator(object):
                                 if self.bf.terrain[cx][cy].base == Tile.Base.Grass:
                                     self.bf.terrain[cx][cy] = Tile(Tile.Base.Pathway, Tile.Overlay.NoOverlay)
 
+    def addWeapon(self):
+        for i in xrange(self.bf.h):
+            j = random.randrange(self.bf.w)
+            if self.bf.terrain[j][i].base == Tile.Base.Grass and self.bf.terrain[j][i].overlay == Tile.Overlay.NoOverlay:
+                self.bf.addItem(Weapon(WeaponType.RifleG12), (j, i))
+                return True
+        return False
+
 class Battlefield(object):
     def __init__(self, seed = None):
         if seed is None:
@@ -352,6 +360,7 @@ class Battlefield(object):
         for i in xrange(3):
             tc.addHouse()
         tc.addPaths()
+        tc.addWeapon()
 
     def addListener(self, listener):
         self.listeners.append(listener)
