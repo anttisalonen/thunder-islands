@@ -42,7 +42,7 @@ class View(object):
     statusbarHeight = 2
     leftPanelWidth = 14
     rightPanelWidth = 14
-    animDelay = 3
+    animDelay = 1
 
     def __init__(self, stdscr, seed):
         self.stdscr = stdscr
