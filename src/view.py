@@ -122,6 +122,8 @@ class View(object):
 
     def drawPeople(self):
         for sold in self.bf.soldiers:
+            if not sold.alive():
+                continue
             char = '@'
             if sold.team == 0:
                 if sold == self.bf.getCurrentSoldier():
