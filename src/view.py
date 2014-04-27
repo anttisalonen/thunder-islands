@@ -77,7 +77,9 @@ class View(object):
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
         self.controller = controller.Controller(self.bf)
-        self.controller.state.cursorpos = self.bf.getCurrentSoldier().getPosition()
+        cp = self.bf.getCurrentSoldier().getPosition()
+        self.controller.state.cursorpos = cp
+        self.centerScreenTo(cp)
 
         g = self.controller.getInput()
         g.next()
@@ -97,6 +99,18 @@ class View(object):
 
     def cursorPosOnScreen(self):
         return self.posOnScreen(self.controller.state.cursorpos)
+
+    def checkCenter(self):
+        if self.controller.state.center == True:
+            self.controller.state.center = False
+            self.centerScreenTo(self.controller.state.cursorpos)
+
+    def centerScreenTo(self, cp):
+        sx = cp[0] - self.mainWindowWidth() / 2
+        sx = max(0, min(self.bf.w - self.mainWindowWidth() - 1, sx))
+        sy = cp[1] - self.mainWindowHeight() / 2
+        sy = max(0, min(self.bf.h - self.mainWindowHeight() - 1, sy))
+        self.screenOffset = sx, sy
 
     def drawTerrain(self):
         for x in xrange(self.screenOffset[0], min(self.winx - View.leftPanelWidth - View.rightPanelWidth + self.screenOffset[0], self.bf.w)):
@@ -272,6 +286,7 @@ class View(object):
         self.addch(bt, '.', 6)
 
     def draw(self):
+        self.checkCenter()
         self.drawTerrain()
         self.drawPath()
         self.drawBullet()
@@ -311,11 +326,17 @@ class View(object):
                 self.running = self.controller.state.running
                 self.checkScreenScroll()
 
+    def mainWindowWidth(self):
+        return self.winx - View.leftPanelWidth - 1 - View.rightPanelWidth
+
+    def mainWindowHeight(self):
+        return self.winy - View.statusbarHeight - 1 - View.infobarHeight
+
     def checkScreenScroll(self):
         cp = self.controller.state.cursorpos
-        sx = max(0, self.screenOffset[0], cp[0] - self.winx + View.leftPanelWidth + 1 + View.rightPanelWidth)
+        sx = max(0, self.screenOffset[0], cp[0] - self.mainWindowWidth())
         sx = min(cp[0], sx)
-        sy = max(0, self.screenOffset[1], cp[1] - self.winy + View.statusbarHeight + 1 + View.infobarHeight)
+        sy = max(0, self.screenOffset[1], cp[1] - self.mainWindowHeight())
         sy = min(cp[1], sy)
         self.screenOffset = sx, sy
 

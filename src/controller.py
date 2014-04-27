@@ -19,6 +19,7 @@ class ControllerState(object):
         self.running = True
         self.currentSoldierIndex = 0
         self.soldierCursorPos = dict()
+        self.center = False
 
     def moveCursor(self, x, y):
         self.message = ''
@@ -149,6 +150,9 @@ class Controller(model.BattlefieldListener):
                             self.pickup(items[0])
                 else:
                     self.state.message = 'Not enough APs to pick up an item.'
+
+            elif c == ord('c') or c == ord('z'):
+                self.state.center = True
 
     def pickup(self, item):
         soldier = self.bf.getCurrentSoldier()
