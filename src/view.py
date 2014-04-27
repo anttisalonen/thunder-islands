@@ -51,6 +51,8 @@ class View(object):
         self.animDelay = View.animDelay
         self.hitPoint = None
         self.screenOffset = 0, 0
+        self.reportedSoldiers = set()
+        self.reportedItems = set()
 
     def run(self):
         curses.noecho()
@@ -318,8 +320,28 @@ class View(object):
                     self.hitPoint = None
                     self.animDelay = View.animDelay
                     if self.bf.moveTarget:
-                        if self.bf.updateMovement():
+                        noaps, newSoldiers, newItems = self.bf.updateMovement()
+                        brandNewSoldiers = newSoldiers - self.reportedSoldiers
+                        brandNewItem = None
+                        for itpos, it in newItems:
+                            if it not in self.reportedItems:
+                                self.reportedItems.add(it)
+                                brandNewItem = itpos, it
+                        self.reportedSoldiers |= brandNewSoldiers
+                        center = None
+                        if brandNewSoldiers:
+                            self.controller.state.message = '%s: I see an enemy!' % soldier.getName()
+                            self.bf.moveTarget = None
+                            center = brandNewSoldiers.pop().getPosition()
+                        elif brandNewItem:
+                            self.controller.state.message = '%s: There\'s something here.' % soldier.getName()
+                            self.bf.moveTarget = None
+                            center = brandNewItem[0]
+                        elif noaps:
                             self.controller.state.message = 'No more APs to move.'
+                        if center:
+                            self.controller.state.cursorpos = center
+                            self.centerScreenTo(center)
                     elif self.bf.shootLine:
                         self.hitPoint = self.bf.updateShot()
                         if self.hitPoint:

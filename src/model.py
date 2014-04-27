@@ -433,15 +433,26 @@ class Battlefield(object):
         assert soldier.getPosition() == self.moveTarget[0]
         self.moveTarget.pop(0)
         if not self.moveTarget:
-            return False
+            return False, set(), set()
         nextStep = self.moveTarget[0]
         assert self.passable(nextStep[0], nextStep[1]), '%dx%d is not passable' % nextStep
         cost = self.movementCost(nextStep[0], nextStep[1])
         if soldier.aps < cost:
             self.moveTarget = None
-            return True
+            return True, set(), set()
         soldier.aps -= cost
+
+        soldiersSeenBefore = set(self.enemySoldiersSeenBySoldier(soldier))
+        itemsSeenBefore = set(self.itemsSeenBySoldier(soldier))
+
         soldier.setPosition(nextStep)
+
+        soldiersSeenAfter = set(self.enemySoldiersSeenBySoldier(soldier))
+        itemsSeenAfter = set(self.itemsSeenBySoldier(soldier))
+
+        newSoldiersSeen = soldiersSeenAfter - soldiersSeenBefore
+        newItemsSeen = itemsSeenAfter - itemsSeenBefore
+        return None, newSoldiersSeen, newItemsSeen
 
     def endTurn(self):
         currentTeam = self.getCurrentSoldier().team
@@ -541,11 +552,31 @@ class Battlefield(object):
         return ret
 
     def soldierSeenByTeam(self, teamnum, soldier):
+        if not soldier.alive():
+            return False
         pos = soldier.getPosition()
         for s in self.soldiers:
             if s.team == teamnum and self.visibilityTo(s, pos) > 0.0:
                 return True
         return False
+
+    def enemySoldiersSeenBySoldier(self, soldier):
+        ret = list()
+        pos = soldier.getPosition()
+        slist = [s for s in self.soldiers if s.team != soldier.team and s.alive()]
+        for s in slist:
+            if self.visibilityTo(soldier, s.getPosition()) > 0.0:
+                ret.append(s)
+        return ret
+
+    def itemsSeenBySoldier(self, soldier):
+        ret = list()
+        pos = soldier.getPosition()
+        for pos, items in self.items.items():
+            if self.visibilityTo(soldier, pos) > 0.0:
+                for it in items:
+                    ret.append((pos, it))
+        return ret
 
     def visibilityTo(self, soldier, position):
         spos = soldier.getPosition()
