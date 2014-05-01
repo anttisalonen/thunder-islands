@@ -322,31 +322,91 @@ class TeamAI(object):
         self.bf = bf
         self.wonGame = False
 
-    def findNearbyObstacles(self, soldier, enemy):
-        return [(5, 5)]
+    def getCoverScore(self, pos, enemies):
+        if not enemies:
+            return 100
+        scores = list()
+        for e in enemies:
+            epos = e.getPosition()
+            line = self.bf.line(pos[0], pos[1], epos[0], epos[1])[1:-1]
+            thisScore = min(len(line), 10)
+            for i, ((lx, ly), err) in enumerate(line):
+                ol = self.bf.terrain[lx][ly].overlay
+                if ol == Tile.Overlay.Tree:
+                    if i == 0:
+                        thisScore *= 2.0
+                    elif i == 1:
+                        thisScore *= 1.3
+                    elif i == 2:
+                        thisScore *= 1.1
+                elif ol == Tile.Overlay.Wall:
+                    thisScore = 20
+                    break
+            scores.append(thisScore)
+        return min(scores)
+
+    def findNearbyCover(self, soldier, enemies):
+        nearbyTrees = list()
+        myposx, myposy = soldier.getPosition()
+        for x in xrange(max(0, myposx - 5), min(self.bf.w, myposx + 5)):
+            for y in xrange(max(0, myposy - 5), min(self.bf.h, myposy + 5)):
+                if self.bf.terrain[x][y].overlay == Tile.Overlay.Tree:
+                    nearbyTrees.append((x, y))
+        positionsBehindTrees = set()
+        for tx, ty in nearbyTrees:
+            for e in enemies:
+                ex, ey = e.getPosition()
+                dx, dy = ex - tx, ey - ty
+                px = tx
+                py = ty
+                if not abs(dy) > 2 * abs(dx):
+                    px += math.copysign(1, dx)
+                if not abs(dx) > 2 * abs(dy):
+                    py += math.copysign(1, dy)
+                if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h and self.bf.passable(px, py):
+                    positionsBehindTrees.add((px, py))
+
+        bestPlace = None
+        highestScore = 0
+        for px, py in positionsBehindTrees:
+            thisScore = self.getCoverScore((px, py), enemies)
+            if thisScore > highestScore:
+                highestScore = thisScore
+                bestPlace = px, py
+
+        return bestPlace
 
     def getInput(self):
         while True:
-            c = (yield)
+            (yield)
 
             currTeam = self.bf.getCurrentSoldier().team
             assert currTeam == 1
             for s in [s for s in self.bf.soldiers if s.team == currTeam and s.alive()]:
                 self.bf.setCurrentSoldier(s)
-                enemies = self.bf.enemySoldiersSeenBySoldier(s)
-                if enemies:
-                    enemy = enemies[0]
-                    obstacles = self.findNearbyObstacles(s, enemy)
-                    if obstacles:
-                        obstacle = obstacles[0]
-                        self.bf.moveTo(obstacle[0], obstacle[1])
-                        while self.bf.moveTarget:
-                            c = (yield)
+                cover = self.findCover()
+                if cover:
+                    self.bf.moveTo(cover[0], cover[1])
+                    while self.bf.moveTarget:
+                        (yield)
             self.bf.endTurn()
 
+    def findCover(self):
+        s = self.bf.getCurrentSoldier()
+        enemies = self.bf.enemySoldiersSeenBySoldier(s)
+        if enemies:
+            cover = self.findNearbyCover(s, enemies)
+            return cover
+        else:
+            return None
+
     def movementUpdated(self, noaps, newSoldiers, newItems):
-        if noaps or newSoldiers or noaps == False:
+        if noaps or noaps == False:
             self.bf.moveTarget = None
+        if newSoldiers:
+            cover = self.findCover()
+            if cover:
+                self.bf.moveTo(cover[0], cover[1])
 
 class Battlefield(object):
     def __init__(self, seed = None):
@@ -627,7 +687,6 @@ class Battlefield(object):
 
     def enemySoldiersSeenBySoldier(self, soldier):
         ret = list()
-        pos = soldier.getPosition()
         slist = [s for s in self.soldiers if s.team != soldier.team and s.alive()]
         for s in slist:
             if self.visibilityTo(soldier, s.getPosition()) > 0.0:

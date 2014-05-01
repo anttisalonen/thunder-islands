@@ -1,13 +1,11 @@
 #!/usr/bin/env python2.7
 
 import curses
-import time
 import os
 import argparse
 
 import model
 import controller
-import log
 
 class Path(object):
     def __init__(self, bf, start, end):
