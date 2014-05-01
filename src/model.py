@@ -318,34 +318,65 @@ class TerrainCreator(object):
         return False
 
 class TeamAI(object):
+    class Personality(object):
+        Defensive = 0
+        Offensive = 1
+
     def __init__(self, bf):
         self.bf = bf
+        self.myTeam = 1
         self.wonGame = False
+        self.personalities = dict()
+        for s in self.bf.soldiersInTeam(self.myTeam):
+            p = random.choice([TeamAI.Personality.Defensive, TeamAI.Personality.Offensive])
+            self.personalities[s] = p
 
-    def getCoverScore(self, pos, enemies):
-        if not enemies:
-            return 100
-        scores = list()
+    def coverScore(self, line):
+        score = min(len(line), 10)
+        for i, ((lx, ly), err) in enumerate(line):
+            ol = self.bf.terrain[lx][ly].overlay
+            if ol == Tile.Overlay.Tree:
+                if i == 0:
+                    score *= 2.0
+                elif i == 1:
+                    score *= 1.3
+                elif i == 2:
+                    score *= 1.1
+            elif ol == Tile.Overlay.Wall:
+                return 15
+        return score
+
+    def getPositionScores(self, pos, enemies):
+        defScores = list([20])
+        offScores = list([0])
         for e in enemies:
             epos = e.getPosition()
             line = self.bf.line(pos[0], pos[1], epos[0], epos[1])[1:-1]
-            thisScore = min(len(line), 10)
-            for i, ((lx, ly), err) in enumerate(line):
-                ol = self.bf.terrain[lx][ly].overlay
-                if ol == Tile.Overlay.Tree:
-                    if i == 0:
-                        thisScore *= 2.0
-                    elif i == 1:
-                        thisScore *= 1.3
-                    elif i == 2:
-                        thisScore *= 1.1
-                elif ol == Tile.Overlay.Wall:
-                    thisScore = 20
-                    break
-            scores.append(thisScore)
-        return min(scores)
+            defScores.append(self.coverScore(line))
+            offScores.append(self.attackScore(line))
+        return min(defScores), max(offScores)
 
-    def findNearbyCover(self, soldier, enemies):
+    def attackScore(self, line):
+        score = 10 - min(len(line), 9)
+        ll = reversed(line)
+        for i, ((lx, ly), err) in enumerate(ll):
+            ol = self.bf.terrain[lx][ly].overlay
+            sd = self.bf.soldierAt(lx, ly)
+            if sd and sd.team == self.myTeam:
+                return 0
+            if ol == Tile.Overlay.Tree:
+                if i == 0:
+                    score *= 0.5
+                elif i == 1:
+                    score *= 0.8
+                elif i == 2:
+                    score *= 0.9
+            elif ol == Tile.Overlay.Wall:
+                return 0
+        return score
+
+    def findCombatPosition(self, soldier, enemies):
+        assert enemies
         nearbyTrees = list()
         myposx, myposy = soldier.getPosition()
         for x in xrange(max(0, myposx - 5), min(self.bf.w, myposx + 5)):
@@ -360,42 +391,74 @@ class TeamAI(object):
                 px = tx
                 py = ty
                 if not abs(dy) > 2 * abs(dx):
-                    px += math.copysign(1, dx)
+                    px -= math.copysign(1, dx)
                 if not abs(dx) > 2 * abs(dy):
-                    py += math.copysign(1, dy)
-                if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h and self.bf.passable(px, py):
+                    py -= math.copysign(1, dy)
+                if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h and (myposx, myposy == px, py or self.bf.passable(px, py)):
                     positionsBehindTrees.add((px, py))
 
-        bestPlace = None
-        highestScore = 0
-        for px, py in positionsBehindTrees:
-            thisScore = self.getCoverScore((px, py), enemies)
-            if thisScore > highestScore:
-                highestScore = thisScore
-                bestPlace = px, py
+        if not positionsBehindTrees:
+            return None
 
-        return bestPlace
+        places = dict()
+        for px, py in positionsBehindTrees:
+            defScore, offScore = self.getPositionScores((px, py), enemies)
+            places[(px, py)] = defScore, offScore
+
+        personality = self.personalities[soldier]
+        if personality == TeamAI.Personality.Defensive:
+            best = sorted(places.items(), key = lambda (k, (d, o)): d, reverse = True)
+            return best[0][0]
+        elif personality == TeamAI.Personality.Offensive:
+            best = sorted(places.items(), key = lambda (k, (d, o)): o, reverse = True)
+            return best[0][0]
+        else:
+            assert False
+
+    def findShotTarget(self):
+        s = self.bf.getCurrentSoldier()
+        mypos = s.getPosition()
+        enemies = self.bf.enemySoldiersSeenByTeam(self.myTeam)
+        bestScore = 0
+        bestTarget = None
+        for e in enemies:
+            epos = e.getPosition()
+            line = self.bf.line(mypos[0], mypos[1], epos[0], epos[1])[1:-1]
+            offScore = self.attackScore(line)
+            if offScore > bestScore:
+                bestScore = offScore
+                bestTarget = epos
+        return bestTarget
 
     def getInput(self):
         while True:
             (yield)
 
             currTeam = self.bf.getCurrentSoldier().team
-            assert currTeam == 1
-            for s in [s for s in self.bf.soldiers if s.team == currTeam and s.alive()]:
+            assert currTeam == self.myTeam
+            for s in self.bf.soldiersInTeam(self.myTeam):
                 self.bf.setCurrentSoldier(s)
-                cover = self.findCover()
+                cover = self.findMovePosition()
                 if cover:
                     self.bf.moveTo(cover[0], cover[1])
                     while self.bf.moveTarget:
                         (yield)
+                    while True:
+                        while self.bf.shootLine:
+                            (yield)
+                        shotTgt = self.findShotTarget()
+                        if not shotTgt:
+                            break
+                        shot = self.bf.shoot(shotTgt[0], shotTgt[1], 1)
+                        if not shot:
+                            break
             self.bf.endTurn()
 
-    def findCover(self):
+    def findMovePosition(self):
         s = self.bf.getCurrentSoldier()
-        enemies = self.bf.enemySoldiersSeenBySoldier(s)
+        enemies = self.bf.enemySoldiersSeenByTeam(self.myTeam)
         if enemies:
-            cover = self.findNearbyCover(s, enemies)
+            cover = self.findCombatPosition(s, enemies)
             return cover
         else:
             return None
@@ -404,7 +467,7 @@ class TeamAI(object):
         if noaps or noaps == False:
             self.bf.moveTarget = None
         if newSoldiers:
-            cover = self.findCover()
+            cover = self.findMovePosition()
             if cover:
                 self.bf.moveTo(cover[0], cover[1])
 
@@ -661,7 +724,7 @@ class Battlefield(object):
 
     def itemsSeenByTeam(self, teamnum):
         ret = dict()
-        slist = [s for s in self.soldiers if s.team == teamnum]
+        slist = self.soldiersInTeam(teamnum)
         for pos, items in self.items.items():
             for s in slist:
                 if self.visibilityTo(s, pos) > 0.0:
@@ -669,26 +732,29 @@ class Battlefield(object):
                     break
         return ret
 
+    def soldiersInTeam(self, teamnum):
+        return [s for s in self.soldiers if s.team == teamnum and s.alive()]
+
     def soldierSeenByTeam(self, teamnum, soldier):
         if not soldier.alive():
             return False
         pos = soldier.getPosition()
-        for s in self.soldiers:
-            if s.team == teamnum and self.visibilityTo(s, pos) > 0.0:
+        for s in self.soldiersInTeam(teamnum):
+            if self.visibilityTo(s, pos) > 0.0:
                 return True
         return False
 
     def enemySoldiersSeenByTeam(self, teamnum):
         ret = set()
-        for s in [s for s in self.soldiers if s.team == teamnum and s.alive()]:
+        for s in self.soldiersInTeam(teamnum):
             for n in self.enemySoldiersSeenBySoldier(s):
                 ret.add(n)
         return ret
 
     def enemySoldiersSeenBySoldier(self, soldier):
         ret = list()
-        slist = [s for s in self.soldiers if s.team != soldier.team and s.alive()]
-        for s in slist:
+        enemyTeam = 1 if soldier.team == 0 else 0
+        for s in self.soldiersInTeam(enemyTeam):
             if self.visibilityTo(soldier, s.getPosition()) > 0.0:
                 ret.append(s)
         return ret

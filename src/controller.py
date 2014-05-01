@@ -57,7 +57,7 @@ class Controller(model.BattlefieldListener):
         self.bf = bf
         self.state = ControllerState(self.bf)
         self.bf.addListener(self)
-        self.mySoldiers = [s for s in self.bf.soldiers if s.team == 0]
+        self.mySoldiers = self.bf.soldiersInTeam(0)
         self.state.currentSoldier = self.mySoldiers[0]
 
     def turnEnded(self, currentTeam):

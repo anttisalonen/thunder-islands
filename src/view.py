@@ -313,11 +313,15 @@ class View(object):
         self.stdscr.refresh()
 
     def getInput(self, g, ai):
+        if not self.bf.soldiersInTeam(0):
+            self.controller.state.message = 'Sector lost!'
+            c = self.stdscr.getch()
+            self.running = c != ord('q')
+            return
+
         soldier = self.bf.getCurrentSoldier()
         if soldier.team != 0:
             ai.send(None)
-            if self.ai.wonGame:
-                self.state.message = 'Sector lost!'
 
         if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
             curses.curs_set(0)
