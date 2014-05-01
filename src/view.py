@@ -83,11 +83,16 @@ class View(object):
         self.controller.state.cursorpos = cp
         self.centerScreenTo(cp)
 
+        # initialise generators/coroutines
+        self.ai = model.TeamAI(self.bf)
+        ai = self.ai.getInput()
+        ai.next()
         g = self.controller.getInput()
         g.next()
+
         while self.running:
             self.draw()
-            self.getInput(g)
+            self.getInput(g, ai)
 
         # cleanup
         curses.nocbreak()
@@ -309,21 +314,23 @@ class View(object):
             self.stdscr.move(cp[1], cp[0])
         self.stdscr.refresh()
 
-    def getInput(self, g):
+    def getInput(self, g, ai):
         soldier = self.bf.getCurrentSoldier()
         if soldier.team != 0:
-            if self.bf.updateAI():
+            ai.send(None)
+            if self.ai.wonGame:
                 self.state.message = 'Sector lost!'
-        else:
-            if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
-                curses.curs_set(0)
-                if self.animDelay > 0:
-                    self.animDelay -= 1
-                else:
-                    self.hitPoint = None
-                    self.animDelay = View.animDelay
-                    if self.bf.moveTarget:
-                        noaps, newSoldiers, newItems = self.bf.updateMovement()
+
+        if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
+            curses.curs_set(0)
+            if self.animDelay > 0:
+                self.animDelay -= 1
+            else:
+                self.hitPoint = None
+                self.animDelay = View.animDelay
+                if self.bf.moveTarget:
+                    noaps, newSoldiers, newItems = self.bf.updateMovement()
+                    if soldier.team == 0:
                         brandNewSoldiers = newSoldiers - self.reportedSoldiers
                         brandNewItem = None
                         for itpos, it in newItems:
@@ -345,13 +352,25 @@ class View(object):
                         if center:
                             self.controller.state.cursorpos = center
                             self.centerScreenTo(center)
-                    elif self.bf.shootLine:
-                        self.hitPoint = self.bf.updateShot()
-                        if self.hitPoint:
-                            soldierHit = self.hitPoint[2]
-                            if soldierHit:
-                                self.controller.state.message = 'Hit %s!' % soldierHit.getName()
-            else:
+                    else:
+                        assert soldier.team == 1
+                        self.ai.movementUpdated(noaps, newSoldiers, newItems)
+                        # if the enemy movement was seen by the player, report it
+                        enemiesSeen = self.bf.enemySoldiersSeenByTeam(0)
+                        brandNewSoldiers = enemiesSeen - self.reportedSoldiers
+                        self.reportedSoldiers |= brandNewSoldiers
+                        if brandNewSoldiers:
+                            self.controller.state.message = 'Enemy sighted!'
+                            center = brandNewSoldiers.pop().getPosition()
+                elif self.bf.shootLine:
+                    self.hitPoint = self.bf.updateShot()
+                    if self.hitPoint:
+                        soldierHit = self.hitPoint[2]
+                        if soldierHit:
+                            self.controller.state.message = 'Hit %s!' % soldierHit.getName()
+
+        else:
+            if soldier.team == 0:
                 curses.curs_set(1)
                 c = self.stdscr.getch()
                 g.send(c)

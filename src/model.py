@@ -317,6 +317,37 @@ class TerrainCreator(object):
                 return True
         return False
 
+class TeamAI(object):
+    def __init__(self, bf):
+        self.bf = bf
+        self.wonGame = False
+
+    def findNearbyObstacles(self, soldier, enemy):
+        return [(5, 5)]
+
+    def getInput(self):
+        while True:
+            c = (yield)
+
+            currTeam = self.bf.getCurrentSoldier().team
+            assert currTeam == 1
+            for s in [s for s in self.bf.soldiers if s.team == currTeam and s.alive()]:
+                self.bf.setCurrentSoldier(s)
+                enemies = self.bf.enemySoldiersSeenBySoldier(s)
+                if enemies:
+                    enemy = enemies[0]
+                    obstacles = self.findNearbyObstacles(s, enemy)
+                    if obstacles:
+                        obstacle = obstacles[0]
+                        self.bf.moveTo(obstacle[0], obstacle[1])
+                        while self.bf.moveTarget:
+                            c = (yield)
+            self.bf.endTurn()
+
+    def movementUpdated(self, noaps, newSoldiers, newItems):
+        if noaps or newSoldiers or noaps == False:
+            self.bf.moveTarget = None
+
 class Battlefield(object):
     def __init__(self, seed = None):
         if seed is None:
@@ -471,29 +502,6 @@ class Battlefield(object):
             l.turnEnded(nextTeam)
         return False
 
-    def findNearbyObstacles(self, soldier, enemy):
-        return [(5, 5)]
-
-    def updateAI(self):
-        currTeam = self.getCurrentSoldier().team
-        assert currTeam == 1
-        for s in [s for s in self.soldiers if s.alive() and s.team == currTeam]:
-            self.setCurrentSoldier(s)
-            enemies = self.enemySoldiersSeenBySoldier(s)
-            if enemies:
-                enemy = enemies[0]
-                obstacles = self.findNearbyObstacles(s, enemy)
-                if obstacles:
-                    obstacle = obstacles[0]
-                    self.moveTo(obstacle[0], obstacle[1])
-                    if self.moveTarget:
-                        while True:
-                            noaps, newSoldiers, newItems = self.updateMovement()
-                            if noaps or newSoldiers or noaps == False:
-                                self.moveTarget = None
-                                break
-        return self.endTurn()
-
     @staticmethod
     def distance(a, b):
         xd = abs(a[0] - b[0])
@@ -609,6 +617,13 @@ class Battlefield(object):
             if s.team == teamnum and self.visibilityTo(s, pos) > 0.0:
                 return True
         return False
+
+    def enemySoldiersSeenByTeam(self, teamnum):
+        ret = set()
+        for s in [s for s in self.soldiers if s.team == teamnum and s.alive()]:
+            for n in self.enemySoldiersSeenBySoldier(s):
+                ret.add(n)
+        return ret
 
     def enemySoldiersSeenBySoldier(self, soldier):
         ret = list()
