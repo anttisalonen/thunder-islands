@@ -36,17 +36,18 @@ class Path(object):
             self.calcPathCost()
 
 class View(object):
-    infobarHeight = 8
+    infobarHeight = 4
     statusbarHeight = 2
     leftPanelWidth = 14
     rightPanelWidth = 14
-    animDelay = 1
+    shotAnimDelay = 1
+    walkAnimDelay = 20
 
     def __init__(self, stdscr, seed):
         self.stdscr = stdscr
         self.bf = model.Battlefield(seed)
         self.path = Path(self.bf, (0,0), (0,0))
-        self.animDelay = View.animDelay
+        self.animDelay = 0
         self.hitPoint = None
         self.screenOffset = 0, 0
         self.reportedSoldiers = set()
@@ -110,12 +111,19 @@ class View(object):
             self.controller.state.center = False
             self.centerScreenTo(self.controller.state.cursorpos)
 
-    def centerScreenTo(self, cp):
+    def possibleCenterOffset(self, cp):
         sx = cp[0] - self.mainWindowWidth() / 2
-        sx = max(0, min(self.bf.w - self.mainWindowWidth() - 1, sx))
+        sx = max(0, min(self.bf.w - self.mainWindowWidth(), sx))
         sy = cp[1] - self.mainWindowHeight() / 2
         sy = max(0, min(self.bf.h - self.mainWindowHeight() - 1, sy))
-        self.screenOffset = sx, sy
+        return sx, sy
+
+    def adjustCenter(self, cp):
+        px, py = self.possibleCenterOffset(cp)
+        self.screenOffset = px, py
+
+    def centerScreenTo(self, cp):
+        self.screenOffset = self.possibleCenterOffset(cp)
 
     def drawItems(self):
         for pos, items in self.bf.itemsSeenByTeam(0).items():
@@ -140,8 +148,8 @@ class View(object):
             self.addch(sold.getPosition(), char, color, 0)
 
     def drawTerrain(self):
-        for x in xrange(self.screenOffset[0], min(self.winx - View.leftPanelWidth - View.rightPanelWidth + self.screenOffset[0], self.bf.w)):
-            for y in xrange(self.screenOffset[1], min(self.winy - View.statusbarHeight - View.infobarHeight + self.screenOffset[1], self.bf.h)):
+        for x in xrange(self.screenOffset[0], min(self.mainWindowWidth() + self.screenOffset[0] + 1, self.bf.w)):
+            for y in xrange(self.screenOffset[1], min(self.mainWindowHeight() + self.screenOffset[1] + 1, self.bf.h)):
                 terr = self.bf.terrain[x][y]
                 attr = 0
                 if terr.overlay == model.Tile.Overlay.Tree:
@@ -212,12 +220,12 @@ class View(object):
                     self.stdscr.addstr(ypos + 2, xpos, 'Health: %-4d' % sold.getHealth(), curses.color_pair(color))
                 else:
                     assert View.leftPanelWidth == View.rightPanelWidth
-                    self.stdscr.addstr(ypos + 1, xpos, ' ' * View.leftPanelWidth)
-                    self.stdscr.addstr(ypos + 2, xpos, ' ' * View.leftPanelWidth)
+                    self.stdscr.addstr(ypos + 1, xpos, ' ' * (View.leftPanelWidth - 1))
+                    self.stdscr.addstr(ypos + 2, xpos, ' ' * (View.leftPanelWidth - 1))
                 ypos += 3
                 ind += 1
                 if ind == 2:
-                    xpos = self.winx - View.rightPanelWidth - 1
+                    xpos = self.winx - View.rightPanelWidth + 1
                     ypos = View.statusbarHeight
 
     def drawInfobar(self):
@@ -329,8 +337,8 @@ class View(object):
                 self.animDelay -= 1
             else:
                 self.hitPoint = None
-                self.animDelay = View.animDelay
                 if self.bf.moveTarget:
+                    self.animDelay = View.walkAnimDelay
                     noaps, newSoldiers, newItems = self.bf.updateMovement()
                     if soldier.team == 0:
                         brandNewSoldiers = newSoldiers - self.reportedSoldiers
@@ -340,7 +348,7 @@ class View(object):
                                 self.reportedItems.add(it)
                                 brandNewItem = itpos, it
                         self.reportedSoldiers |= brandNewSoldiers
-                        center = None
+                        center = soldier.getPosition()
                         if brandNewSoldiers:
                             self.controller.state.message = '%s: I see an enemy!' % soldier.getName()
                             self.bf.moveTarget = None
@@ -349,27 +357,37 @@ class View(object):
                             self.controller.state.message = '%s: There\'s something here.' % soldier.getName()
                             self.bf.moveTarget = None
                             center = brandNewItem[0]
+                        elif newSoldiers:
+                            self.controller.state.message = '%s: the enemy!' % soldier.getName()
+                            self.bf.moveTarget = None
                         elif noaps:
                             self.controller.state.message = 'No more APs to move.'
                         if center:
                             self.controller.state.cursorpos = center
-                            self.centerScreenTo(center)
+                            self.adjustCenter(center)
+                            self.checkScreenScroll()
                     else:
                         assert soldier.team == 1
                         self.ai.movementUpdated(noaps, newSoldiers, newItems)
+                        if self.bf.soldierSeenByTeam(0, soldier):
+                            center = soldier.getPosition()
+                            self.controller.state.cursorpos = center
+                            self.adjustCenter(center)
+                            self.checkScreenScroll()
                         # if the enemy movement was seen by the player, report it
                         enemiesSeen = self.bf.enemySoldiersSeenByTeam(0)
                         brandNewSoldiers = enemiesSeen - self.reportedSoldiers
                         self.reportedSoldiers |= brandNewSoldiers
                         if brandNewSoldiers:
                             self.controller.state.message = 'Enemy sighted!'
-                            center = brandNewSoldiers.pop().getPosition()
-                elif self.bf.shootLine:
-                    self.hitPoint = self.bf.updateShot()
-                    if self.hitPoint:
-                        soldierHit = self.hitPoint[2]
-                        if soldierHit:
-                            self.controller.state.message = 'Hit %s!' % soldierHit.getName()
+                else:
+                    self.animDelay = View.shotAnimDelay
+                    if self.bf.shootLine:
+                        self.hitPoint = self.bf.updateShot()
+                        if self.hitPoint:
+                            soldierHit = self.hitPoint[2]
+                            if soldierHit:
+                                self.controller.state.message = 'Hit %s!' % soldierHit.getName()
 
         else:
             if soldier.team == 0:
@@ -380,6 +398,7 @@ class View(object):
                 if self.controller.state.droppedItem is not None:
                     self.reportedItems.add(self.controller.state.droppedItem)
                     self.controller.state.droppedItem = None
+                self.adjustCenter(self.controller.state.cursorpos)
                 self.checkScreenScroll()
 
     def mainWindowWidth(self):
@@ -389,12 +408,14 @@ class View(object):
         return self.winy - View.statusbarHeight - 1 - View.infobarHeight
 
     def checkScreenScroll(self):
+        # ensure cursor is within borders
         cp = self.controller.state.cursorpos
         sx = max(0, self.screenOffset[0], cp[0] - self.mainWindowWidth())
         sx = min(cp[0], sx)
         sy = max(0, self.screenOffset[1], cp[1] - self.mainWindowHeight())
         sy = min(cp[1], sy)
         self.screenOffset = sx, sy
+
 
 def main(stdscr, seed):
     view = View(stdscr, seed)
@@ -404,7 +425,7 @@ if __name__ == '__main__':
     os.environ['TERM'] = 'xterm-256color'
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--seed', help='random seed', type=int)
+    parser.add_argument('-s', '--seed', help='random seed', type=int, default=231)
     args = parser.parse_args()
     curses.wrapper(lambda stdscr: main(stdscr, args.seed))
 
