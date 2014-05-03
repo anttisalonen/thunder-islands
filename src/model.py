@@ -490,13 +490,20 @@ class Battlefield(object):
 
         self.items = collections.defaultdict(list)
 
+        self.createTerrain()
+
         names = soldierNames()
         for i in xrange(8):
             t = i % 2
             if t == 0:
                 x = 0
+                y = i + 20
             else:
-                x = 30
+                for i in xrange(5):
+                    x = random.randrange(30, self.w)
+                    y = random.randrange(20, self.h)
+                    if self.passable(x, y):
+                        break
 
             if i % 3 != 0:
                 wp = WeaponType.Magnum357
@@ -504,7 +511,7 @@ class Battlefield(object):
             else:
                 wp = WeaponType.RifleG12
                 bt = BulletType.Gauge12
-            s = Soldier(x, i + 20, t, getSoldierAttributes(t != 0, names))
+            s = Soldier(x, y, t, getSoldierAttributes(t != 0, names))
             if i == 0:
                 self.setCurrentSoldier(s)
             s.addToInventory(Weapon(wp))
@@ -512,10 +519,10 @@ class Battlefield(object):
                 s.addToInventory(Clip(bt))
             self.soldiers.append(s)
 
-        self.createTerrain()
-
         for s in self.soldiers:
             s.refreshAPs()
+
+        self.setCurrentSoldier(self.soldiers[0])
 
     def createTerrain(self):
         tc = TerrainCreator(self)
