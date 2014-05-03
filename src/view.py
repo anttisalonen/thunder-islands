@@ -36,24 +36,10 @@ class Path(object):
             self.calcPathCost()
 
 class View(object):
-    infobarHeight = 4
-    statusbarHeight = 2
-    leftPanelWidth = 14
-    rightPanelWidth = 14
-    shotAnimDelay = 1
-    walkAnimDelay = 20
-
     def __init__(self, stdscr, seed):
         self.stdscr = stdscr
-        self.bf = model.Battlefield(seed)
-        self.path = Path(self.bf, (0,0), (0,0))
-        self.animDelay = 0
-        self.hitPoint = None
-        self.screenOffset = 0, 0
-        self.reportedSoldiers = set()
-        self.reportedItems = set()
+        self.island = model.Island(seed)
 
-    def run(self):
         curses.noecho()
         curses.cbreak()
         self.stdscr.keypad(1)
@@ -74,7 +60,43 @@ class View(object):
         curses.init_pair(11, 33, 7) # soldier team 1, selected
 
         self.stdscr.leaveok(0)
+        self.view = BattlefieldView(self.stdscr, self.island)
 
+    def run(self):
+        while True:
+            ret = self.view.run()
+            if ret == 0:
+                # cleanup
+                curses.nocbreak()
+                self.stdscr.keypad(0)
+                curses.echo()
+                curses.endwin()
+                break
+            else:
+                travelled = self.island.travel(ret)
+                if travelled:
+                    self.view = BattlefieldView(self.stdscr, self.island)
+
+class BattlefieldView(object):
+    infobarHeight = 4
+    statusbarHeight = 2
+    leftPanelWidth = 14
+    rightPanelWidth = 14
+    shotAnimDelay = 1
+    walkAnimDelay = 20
+
+    def __init__(self, stdscr, island):
+        self.stdscr = stdscr
+        self.island = island
+        self.bf = self.island.getCurrentBattlefield()
+        self.path = Path(self.bf, (0,0), (0,0))
+        self.animDelay = 0
+        self.hitPoint = None
+        self.screenOffset = 0, 0
+        self.reportedSoldiers = set()
+        self.reportedItems = set()
+
+    def run(self):
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
         self.controller = controller.Controller(self.bf)
@@ -89,19 +111,17 @@ class View(object):
         g = self.controller.getInput()
         g.next()
 
-        while self.running:
+        while self.running and self.controller.state.travelling == 0:
             self.draw()
             self.getInput(g, ai)
-
-        # cleanup
-        curses.nocbreak()
-        self.stdscr.keypad(0)
-        curses.echo()
-        curses.endwin()
+        if not self.running:
+            return 0
+        else:
+            return self.controller.state.travelling
 
     def posOnScreen(self, pos):
         cpx, cpy = pos
-        return cpx - self.screenOffset[0] + View.leftPanelWidth, cpy - self.screenOffset[1] + View.statusbarHeight
+        return cpx - self.screenOffset[0] + BattlefieldView.leftPanelWidth, cpy - self.screenOffset[1] + BattlefieldView.statusbarHeight
 
     def cursorPosOnScreen(self):
         return self.posOnScreen(self.controller.state.cursorpos)
@@ -205,7 +225,7 @@ class View(object):
 
     def drawSidePanels(self):
         xpos = 0
-        ypos = View.statusbarHeight
+        ypos = BattlefieldView.statusbarHeight
         currsold = self.bf.getCurrentSoldier()
         ind = 0
         for sold in self.bf.soldiers:
@@ -219,18 +239,18 @@ class View(object):
                     self.stdscr.addstr(ypos + 1, xpos, 'APs:    %-4d' % sold.getAPs(), curses.color_pair(color))
                     self.stdscr.addstr(ypos + 2, xpos, 'Health: %-4d' % sold.getHealth(), curses.color_pair(color))
                 else:
-                    assert View.leftPanelWidth == View.rightPanelWidth
-                    self.stdscr.addstr(ypos + 1, xpos, ' ' * (View.leftPanelWidth - 1))
-                    self.stdscr.addstr(ypos + 2, xpos, ' ' * (View.leftPanelWidth - 1))
+                    assert BattlefieldView.leftPanelWidth == BattlefieldView.rightPanelWidth
+                    self.stdscr.addstr(ypos + 1, xpos, ' ' * (BattlefieldView.leftPanelWidth - 1))
+                    self.stdscr.addstr(ypos + 2, xpos, ' ' * (BattlefieldView.leftPanelWidth - 1))
                 ypos += 3
                 ind += 1
                 if ind == 2:
-                    xpos = self.winx - View.rightPanelWidth + 1
-                    ypos = View.statusbarHeight
+                    xpos = self.winx - BattlefieldView.rightPanelWidth + 1
+                    ypos = BattlefieldView.statusbarHeight
 
     def drawInfobar(self):
         xpos = 0
-        ypos = self.winy - View.infobarHeight
+        ypos = self.winy - BattlefieldView.infobarHeight
         currsold = self.bf.getCurrentSoldier()
         if currsold.team == 0:
             if self.path.getPath():
@@ -289,10 +309,10 @@ class View(object):
 
     def addch(self, pos, ch, color, attr = 0):
         pos = self.posOnScreen(pos)
-        if pos[1] < self.winy - View.infobarHeight and \
-                pos[1] >= View.statusbarHeight and \
-                pos[0] < self.winx - View.rightPanelWidth and \
-                pos[0] >= View.leftPanelWidth:
+        if pos[1] < self.winy - BattlefieldView.infobarHeight and \
+                pos[1] >= BattlefieldView.statusbarHeight and \
+                pos[0] < self.winx - BattlefieldView.rightPanelWidth and \
+                pos[0] >= BattlefieldView.leftPanelWidth:
             self.stdscr.addch(pos[1], pos[0], ch, curses.color_pair(color) | attr)
 
     def drawBullet(self):
@@ -321,7 +341,7 @@ class View(object):
         self.stdscr.refresh()
 
     def getInput(self, g, ai):
-        if not self.bf.soldiersInTeam(0):
+        if not self.bf.soldiersInTeam(0) and not self.bf.isFriendly():
             self.controller.state.message = 'Sector lost!'
             c = self.stdscr.getch()
             self.running = c != ord('q')
@@ -338,7 +358,8 @@ class View(object):
             else:
                 self.hitPoint = None
                 if self.bf.moveTarget:
-                    self.animDelay = View.walkAnimDelay
+                    self.animDelay = BattlefieldView.walkAnimDelay
+                    self.reportedSoldiers = self.bf.enemySoldiersSeenByTeam(0)
                     noaps, newSoldiers, newItems = self.bf.updateMovement()
                     if soldier.team == 0:
                         brandNewSoldiers = newSoldiers - self.reportedSoldiers
@@ -357,9 +378,6 @@ class View(object):
                             self.controller.state.message = '%s: There\'s something here.' % soldier.getName()
                             self.bf.moveTarget = None
                             center = brandNewItem[0]
-                        elif newSoldiers:
-                            self.controller.state.message = '%s: the enemy!' % soldier.getName()
-                            self.bf.moveTarget = None
                         elif noaps:
                             self.controller.state.message = 'No more APs to move.'
                         if center:
@@ -381,7 +399,7 @@ class View(object):
                         if brandNewSoldiers:
                             self.controller.state.message = 'Enemy sighted!'
                 else:
-                    self.animDelay = View.shotAnimDelay
+                    self.animDelay = BattlefieldView.shotAnimDelay
                     if self.bf.shootLine:
                         self.hitPoint = self.bf.updateShot()
                         if self.hitPoint:
@@ -402,10 +420,10 @@ class View(object):
                 self.checkScreenScroll()
 
     def mainWindowWidth(self):
-        return self.winx - View.leftPanelWidth - 1 - View.rightPanelWidth
+        return self.winx - BattlefieldView.leftPanelWidth - 1 - BattlefieldView.rightPanelWidth
 
     def mainWindowHeight(self):
-        return self.winy - View.statusbarHeight - 1 - View.infobarHeight
+        return self.winy - BattlefieldView.statusbarHeight - 1 - BattlefieldView.infobarHeight
 
     def checkScreenScroll(self):
         # ensure cursor is within borders

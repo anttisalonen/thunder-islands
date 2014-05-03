@@ -21,6 +21,7 @@ class ControllerState(object):
         self.soldierCursorPos = dict()
         self.center = False
         self.droppedItem = None
+        self.travelling = 0
 
     def moveCursor(self, x, y):
         self.message = ''
@@ -58,17 +59,24 @@ class Controller(model.BattlefieldListener):
         self.state = ControllerState(self.bf)
         self.bf.addListener(self)
         self.mySoldiers = self.bf.soldiersInTeam(0)
-        self.state.currentSoldier = self.mySoldiers[0]
+        try:
+            self.state.currentSoldier = self.mySoldiers[0]
+        except IndexError:
+            self.state.currentSoldier = None
 
     def turnEnded(self, currentTeam):
-        if currentTeam == 0:
+        if self.state.currentSoldier and currentTeam == 0:
             self.bf.setCurrentSoldier(self.state.currentSoldier)
 
     def getInput(self):
         while True:
             c = (yield)
+            try:
+                cc = chr(c)
+            except ValueError:
+                cc = None
             self.state.pressedKeyCode = c
-            if c == ord('q'):
+            if cc == 'q':
                 self.state.running = False
 
             if c == curses.KEY_DOWN or c == 50:
@@ -90,41 +98,46 @@ class Controller(model.BattlefieldListener):
             elif c == 57:
                 self.state.moveCursor(1, -1)
             elif c == 10 or c == 13 or c == curses.KEY_ENTER:
-                self.state.stopAim()
-                self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
-                self.state.soldierCursorPos[self.state.currentSoldier] = self.state.cursorpos
+                if self.state.currentSoldier:
+                    self.state.stopAim()
+                    self.bf.moveTo(self.state.cursorpos[0], self.state.cursorpos[1])
+                    self.state.soldierCursorPos[self.state.currentSoldier] = self.state.cursorpos
             elif c >= curses.KEY_F2 and c <= curses.KEY_F5:
                 self.state.stopAim()
                 soldIndex = c - curses.KEY_F2
-                sold = self.mySoldiers[soldIndex]
-                if sold.alive():
-                    self.bf.setCurrentSoldier(sold)
-                    self.state.currentSoldier = sold
                 try:
-                    self.state.cursorpos = self.state.soldierCursorPos[self.state.currentSoldier]
-                except KeyError:
-                    self.state.cursorpos = self.bf.getCurrentSoldier().getPosition()
-                self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
-            elif c == ord(' '):
+                    sold = self.mySoldiers[soldIndex]
+                except IndexError:
+                    pass
+                else:
+                    if sold.alive():
+                        self.bf.setCurrentSoldier(sold)
+                        self.state.currentSoldier = sold
+                    try:
+                        self.state.cursorpos = self.state.soldierCursorPos[self.state.currentSoldier]
+                    except KeyError:
+                        self.state.cursorpos = self.bf.getCurrentSoldier().getPosition()
+                    self.state.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
+            elif cc == ' ':
                 self.state.stopAim()
                 self.state.message = 'End of turn...'
-                if self.bf.endTurn():
+                if self.bf.endTurn() and not self.bf.isFriendly():
                     self.state.message = 'Sector won!'
-            elif c == ord('f'):
+            elif cc == 'f':
                 self.state.aim()
-            elif c == ord('F'):
+            elif cc == 'F':
                 self.state.shoot()
 
-            elif c == ord('i') or c == ord('d'):
-                self.state.dropping = c == ord('d')
+            elif cc == 'i' or cc == 'd':
+                self.state.dropping = cc == 'd'
                 self.state.showInventory = True
                 while True:
                     c = (yield)
-                    if not self.state.dropping and (c == ord('i') or c == ord('q') or self.exitItemMenu(c)):
+                    if not self.state.dropping and (cc == 'i' or cc == 'q' or self.exitItemMenu(cc)):
                         self.state.showInventory = False
                         break
                     elif self.state.dropping:
-                        if self.exitItemMenu(c):
+                        if self.exitItemMenu(cc):
                             break
                         else:
                             soldier = self.bf.getCurrentSoldier()
@@ -136,7 +149,7 @@ class Controller(model.BattlefieldListener):
                                 break
                 self.state.showInventory = False
 
-            elif c == ord(','):
+            elif cc == ',':
                 soldier = self.bf.getCurrentSoldier()
                 if soldier.hasAPsToPickup():
                     pos = soldier.getPosition()
@@ -159,18 +172,25 @@ class Controller(model.BattlefieldListener):
                 else:
                     self.state.message = 'Not enough APs to pick up an item.'
 
-            elif c == ord('c') or c == ord('z'):
+            elif cc == 'c' or cc == 'z':
                 self.state.center = True
 
+            elif cc == 'h' or cc == 'j' or cc == 'k' or cc == 'l':
+                if cc == 'h':
+                    self.state.travelling = 1
+                elif cc == 'j':
+                    self.state.travelling = 2
+                elif cc == 'k':
+                    self.state.travelling = 3
+                else:
+                    self.state.travelling = 4
+
     def pickup(self, item):
-        soldier = self.bf.getCurrentSoldier()
-        pos = soldier.getPosition()
-        char = soldier.pickup(item)
+        char = self.bf.pickup(item)
         if char:
-            self.bf.removeItem(item, pos)
             self.state.message = '%c - %s.' % (char, item.getName())
 
-    def exitItemMenu(self, c):
-        return c == ord(' ') or c == ord('\n')
+    def exitItemMenu(self, cc):
+        return cc == ' ' or cc == '\n'
 
 

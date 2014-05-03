@@ -150,8 +150,6 @@ class Soldier(object):
         return True
 
     def pickup(self, item):
-        if not self.useAPs(Soldier.APsToPickup):
-            return False
         return self.addToInventory(item)
 
     def addToInventory(self, item):
@@ -210,21 +208,49 @@ class TerrainCreator(object):
                     if tree:
                         self.bf.terrain[i][j] = Tile(Tile.Base.Grass, Tile.Overlay.Tree)
 
-    def addCoastLine(self, width):
-        for i in xrange(self.bf.w):
-            for j in xrange(width):
-                self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
+    def addCoastLine(self, width, border):
+        assert border >= 1 and border <= 4
+        if border == 1:
+            length = self.bf.h
+            for i in xrange(width):
+                for j in xrange(self.bf.h):
+                    self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
+        elif border == 2:
+            length = self.bf.w
+            for i in xrange(self.bf.w):
+                for j in xrange(self.bf.h - width, self.bf.h):
+                    self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
+        elif border == 3:
+            length = self.bf.w
+            for i in xrange(self.bf.w):
+                for j in xrange(width):
+                    self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
+        else:
+            length = self.bf.h
+            for i in xrange(self.bf.w - width, self.bf.w):
+                for j in xrange(self.bf.h):
+                    self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
         for i in xrange(6, 1, -1):
-            for iteration in xrange(self.bf.w / 4):
+            for iteration in xrange(length / 4):
                 rad = random.randrange(1, i)
-                pos = random.randrange(0, self.bf.w)
+                pos = random.randrange(0, length)
                 water = random.choice([True, False])
                 for j in xrange(rad * 2):
                     for k in xrange(rad * 2):
                         dist = (j - rad) * (j - rad) + (k - rad) * (k - rad)
                         if math.sqrt(dist) <= rad:
-                            px = pos + j - rad
-                            py = width + k - rad
+                            if border == 1:
+                                px = width + k - rad
+                                py = pos + j - rad
+                            elif border == 2:
+                                px = pos + j - rad
+                                py = self.bf.h - (width + k - rad)
+                            elif border == 3:
+                                px = pos + j - rad
+                                py = width + k - rad
+                            else:
+                                px = self.bf.w - (width + k - rad)
+                                py = pos + j - rad
                             if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h:
                                 self.bf.terrain[px][py].base = Tile.Base.Water
                                 if water:
@@ -325,7 +351,6 @@ class TeamAI(object):
     def __init__(self, bf):
         self.bf = bf
         self.myTeam = 1
-        self.wonGame = False
         self.personalities = dict()
         for s in self.bf.soldiersInTeam(self.myTeam):
             p = random.choice([TeamAI.Personality.Defensive, TeamAI.Personality.Offensive])
@@ -471,13 +496,101 @@ class TeamAI(object):
             if cover:
                 self.bf.moveTo(cover[0], cover[1])
 
-class Battlefield(object):
+class Island(object):
     def __init__(self, seed = None):
         if seed is None:
             seed = int(time.time())
         random.seed(seed)
         log.log('Random seed: %d' % seed)
 
+        self.sectors = dict()
+        self.currSector = 2, 3
+        self.islandSize = 3, 4
+
+        for i in xrange(3):
+            self.sectors[i] = dict()
+            for j in xrange(4):
+                border = 0
+                if i == 0:
+                    border |= 0x01
+                if i == 2:
+                    border |= 0x08
+                if j == 0:
+                    border |= 0x04
+                if j == 3:
+                    border |= 0x02
+                self.sectors[i][j] = Battlefield(border)
+                if i != self.currSector[0] or j != self.currSector[1]:
+                    self.sectors[i][j].addEnemySoldiers()
+
+        self.playerSoldiers = list()
+
+        names = soldierNames()
+        for i in xrange(4):
+            wp = WeaponType.Magnum357
+            bt = BulletType.Cal357
+            s = Soldier(0, 0, 0, getSoldierAttributes(False, names))
+            s.addToInventory(Weapon(wp))
+            for j in xrange(3):
+                s.addToInventory(Clip(bt))
+            self.playerSoldiers.append(s)
+
+        self.placeSoldiers(0)
+
+    def getCurrentBattlefield(self):
+        return self.bf
+
+    def placeSoldiers(self, direction):
+        self.bf = self.sectors[self.currSector[0]][self.currSector[1]]
+
+        for i, s in enumerate(self.playerSoldiers):
+            x = self.bf.w / 2
+            y = i + self.bf.h / 2
+            xd = 1
+            yd = 1
+            if direction == 1:
+                x = self.bf.w - 1
+                xd = -1
+            elif direction == 2:
+                y = i
+            elif direction == 3:
+                y = self.bf.h - i - 1
+                yd = -1
+            elif direction == 4:
+                x = 0
+            for j in xrange(10):
+                if self.bf.passable(x, y):
+                    break
+                x += xd
+                y += yd
+            s.x = x
+            s.y = y
+
+        self.bf.setCurrentSoldier(self.playerSoldiers[0])
+        for s in self.playerSoldiers:
+            self.bf.soldiers.append(s)
+
+    def travel(self, direction):
+        assert direction >= 1 and direction <= 4
+        nx, ny = self.currSector
+        if direction == 1:
+            nx -= 1
+        elif direction == 2:
+            ny += 1
+        elif direction == 3:
+            ny -= 1
+        else:
+            nx += 1
+        if nx < 0 or ny < 0 or nx >= self.islandSize[0] or ny >= self.islandSize[1]:
+            return False
+
+        self.bf.removeSoldiersFromTeam(0)
+        self.currSector = nx, ny
+        self.placeSoldiers(direction)
+        return True
+
+class Battlefield(object):
+    def __init__(self, border):
         self.w = 80
         self.h = 40
         self.soldiers = list()
@@ -487,23 +600,23 @@ class Battlefield(object):
         self.shootLine = None
         self.shotDistance = None
         self.currentSoldier = None
+        self.friendly = True
 
         self.items = collections.defaultdict(list)
 
-        self.createTerrain()
+        self.createTerrain(border)
 
-        names = soldierNames()
-        for i in xrange(8):
-            t = i % 2
-            if t == 0:
-                x = 0
-                y = i + 20
-            else:
-                for i in xrange(5):
-                    x = random.randrange(30, self.w)
-                    y = random.randrange(20, self.h)
-                    if self.passable(x, y):
-                        break
+        for s in self.soldiers:
+            s.refreshAPs()
+
+    def addEnemySoldiers(self):
+        self.friendly = False
+        for i in xrange(4):
+            for j in xrange(5):
+                x = random.randrange(30, self.w)
+                y = random.randrange(20, self.h)
+                if self.passable(x, y):
+                    break
 
             if i % 3 != 0:
                 wp = WeaponType.Magnum357
@@ -511,23 +624,28 @@ class Battlefield(object):
             else:
                 wp = WeaponType.RifleG12
                 bt = BulletType.Gauge12
-            s = Soldier(x, y, t, getSoldierAttributes(t != 0, names))
+            s = Soldier(x, y, 1, getSoldierAttributes(True, None))
             if i == 0:
                 self.setCurrentSoldier(s)
             s.addToInventory(Weapon(wp))
-            for i in xrange(3):
+            for j in xrange(3):
                 s.addToInventory(Clip(bt))
             self.soldiers.append(s)
 
-        for s in self.soldiers:
-            s.refreshAPs()
+    def removeSoldiersFromTeam(self, teamnum):
+        self.soldiers = [s for s in self.soldiers if s.team != teamnum]
 
-        self.setCurrentSoldier(self.soldiers[0])
-
-    def createTerrain(self):
+    def createTerrain(self, border):
         tc = TerrainCreator(self)
         tc.addRandomForest()
-        tc.addCoastLine(8)
+        if border & 0x01:
+            tc.addCoastLine(8, 1)
+        if border & 0x02:
+            tc.addCoastLine(8, 2)
+        if border & 0x04:
+            tc.addCoastLine(8, 3)
+        if border & 0x08:
+            tc.addCoastLine(8, 4)
         for i in xrange(3):
             tc.addHouse()
         tc.addPaths()
@@ -590,10 +708,10 @@ class Battlefield(object):
         nextStep = self.moveTarget[0]
         assert self.passable(nextStep[0], nextStep[1]), '%dx%d is not passable' % nextStep
         cost = self.movementCost(nextStep[0], nextStep[1])
-        if soldier.aps < cost:
+
+        if not self.friendly and not soldier.useAPs(cost):
             self.moveTarget = None
             return True, set(), set()
-        soldier.aps -= cost
 
         soldiersSeenBefore = set(self.enemySoldiersSeenBySoldier(soldier))
         itemsSeenBefore = set(self.itemsSeenBySoldier(soldier))
@@ -641,7 +759,7 @@ class Battlefield(object):
     def shoot(self, x, y, aiming):
         assert aiming > 0 and aiming < 5
         sold = self.getCurrentSoldier()
-        if not sold.useAPs(10):
+        if not self.friendly and not sold.useAPs(10):
             return False
 
         soldpos = sold.getPosition()
@@ -792,15 +910,16 @@ class Battlefield(object):
             visibility -= drop
         return visibility
 
-def main():
-    bf = Battlefield()
-    ps1 = [(0, 0), (5, 6), (8, 8), (3, 2), (3298, 489), (347, 38)]
-    ps2 = [(84, 47), (347, 48), (337, 38), (357, 38), (347, 28), (37, 3), (2, 2), (0, 0), (3, 2), (484, 9293), (484, 484), (200, 200)]
-    for sp in ps1:
-        for ep in ps2:
-            l = bf.line(sp[0], sp[1], ep[0], ep[1])
-            print sp, ep, max(l[1]), sum(l[1]) / float(len(l[1]))
+    def isFriendly(self):
+        return self.friendly
 
-if __name__ == '__main__':
-    main()
+    def pickup(self, item):
+        if not self.friendly and not self.useAPs(Soldier.APsToPickup):
+            return False
+        soldier = self.getCurrentSoldier()
+        pos = soldier.getPosition()
+        char = soldier.pickup(item)
+        if char:
+            self.removeItem(item, pos)
+        return char
 
