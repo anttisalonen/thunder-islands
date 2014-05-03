@@ -206,7 +206,7 @@ class TerrainCreator(object):
         for i in xrange(self.bf.w):
             for j in xrange(self.bf.h):
                 if self.bf.terrain[i][j].base != Tile.Base.Water:
-                    tree = i != 0 and i != self.bf.w - 1 and random.randrange(3) == 0
+                    tree = i != 0 and i != self.bf.w - 1 and random.randrange(6) == 0
                     if tree:
                         self.bf.terrain[i][j] = Tile(Tile.Base.Grass, Tile.Overlay.Tree)
 
