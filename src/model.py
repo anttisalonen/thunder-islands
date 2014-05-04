@@ -517,6 +517,25 @@ class TeamAI(object):
             if cover:
                 self.bf.moveTo(cover[0], cover[1])
 
+class DayTime(object):
+    def __init__(self):
+        self.hours = 6
+        self.minutes = 0
+        self.seconds = 0
+
+    def progress(self, hours, minutes, seconds):
+        self.seconds += seconds
+        if self.seconds >= 60:
+            minutes += self.seconds / 60
+            self.seconds = self.seconds % 60
+        self.minutes += minutes
+        if self.minutes >= 60:
+            hours += self.minutes / 60
+            self.minutes = self.minutes % 60
+        self.hours += hours
+        if self.hours >= 24:
+            self.hours = self.hours % 24
+
 class Island(object):
     def __init__(self, seed=None):
         if seed is None:
@@ -528,6 +547,7 @@ class Island(object):
         self.currSector = 2, 3
         self.islandSize = 3, 4
         self.bf = None
+        self.time = DayTime()
 
         for i in xrange(3):
             self.sectors[i] = dict()
@@ -609,7 +629,11 @@ class Island(object):
         self.bf.removeSoldiersFromTeam(0)
         self.currSector = nx, ny
         self.placeSoldiers(direction)
+        self.time.progress(0, 15, 0)
         return True
+
+    def progressTime(self):
+        self.time.progress(0, 5, 0)
 
 class Battlefield(object):
     def __init__(self, border):

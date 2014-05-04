@@ -231,6 +231,7 @@ class BattlefieldView(object):
         else:
             msg = ''
         self.stdscr.addstr(0, 0, '%-80s' % msg)
+        self.stdscr.addstr(1, self.winx - 10, '%02d:%02d' % (self.island.time.hours, self.island.time.minutes))
 
     def drawSidePanels(self):
         xpos = 0
@@ -368,6 +369,9 @@ class BattlefieldView(object):
                 c = self.stdscr.getch()
                 g.send(c)
                 self.running = self.controller.cflags.running
+                if self.controller.cflags.turnEnded:
+                    self.controller.cflags.turnEnded = False
+                    self.island.progressTime()
                 if self.controller.cflags.droppedItem is not None:
                     self.reportedItems.add(self.controller.cflags.droppedItem)
                     self.controller.cflags.droppedItem = None

@@ -12,6 +12,7 @@ class ViewFlags(object):
         self.center = False
         self.droppedItem = None
         self.travelling = 0
+        self.turnEnded = True
 
 class ViewState(object):
     def __init__(self, bf):
@@ -200,7 +201,9 @@ class Controller(model.BattlefieldListener):
                 self.soldierCursorPos[self.currentSoldier] = self.cstate.cursorpos
         elif cc == ' ':
             self.cstate.stopAim()
-            self.cstate.message = 'End of turn...'
+            if not self.bf.isFriendly():
+                self.cstate.message = 'End of turn...'
+            self.cflags.turnEnded = True
             if self.bf.endTurn() and not self.bf.isFriendly():
                 self.cstate.message = 'Sector won!'
         elif cc == 'f':
