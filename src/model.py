@@ -914,9 +914,9 @@ class Battlefield(object):
         return self.friendly
 
     def pickup(self, item):
-        if not self.friendly and not self.useAPs(Soldier.APsToPickup):
-            return False
         soldier = self.getCurrentSoldier()
+        if not self.friendly and not soldier.useAPs(Soldier.APsToPickup):
+            return False
         pos = soldier.getPosition()
         char = soldier.pickup(item)
         if char:
