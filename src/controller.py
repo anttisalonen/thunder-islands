@@ -22,6 +22,7 @@ class ViewState(object):
         self.message = ''
         self.pressedKeyCode = 0
         self.showInventory = False
+        self.showStats = False
         self.showPickupMenu = False
         self.itemMenu = dict()
 
@@ -127,6 +128,14 @@ class Controller(model.BattlefieldListener):
                             self.pickup(items[0])
                 else:
                     self.cstate.message = 'Not enough APs to pick up an item.'
+            elif c == ord('s'):
+                self.cstate.showStats = True
+                while True:
+                    c = (yield)
+                    if c == ord('s') or c == ord('q') or exitItemMenu(c):
+                        self.cstate.showStats = False
+                        break
+                self.cstate.showStats = False
 
             self._handleCursorMove(c)
             self._handleUIChange(c)
@@ -180,7 +189,7 @@ class Controller(model.BattlefieldListener):
                 self.cstate.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
         elif cc == 'c' or cc == 'z':
             self.cflags.center = True
-        elif cc == 's':
+        elif cc == 'S':
             self._saveGame()
 
     def _saveGame(self):

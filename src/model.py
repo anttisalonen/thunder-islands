@@ -84,18 +84,21 @@ def soldierNames():
         yield n
 
 class SoldierAttributes(object):
-    def __init__(self, name, stamina, health):
+    def __init__(self, name, stamina, health, marksmanship):
         self.name = name
         self.stamina = stamina
         self.health = health
+        self.marksmanship = marksmanship
 
 def getSoldierAttributes(enemy, names):
     stamina = random.randrange(50, 90)
     health = random.randrange(50, 90)
+    marksmanship = random.randrange(20, 90)
     if enemy:
-        return SoldierAttributes('enemy', stamina, health)
+        name = 'enemy'
     else:
-        return SoldierAttributes(names.next(), stamina, health)
+        name = names.next()
+    return SoldierAttributes(name, stamina, health, marksmanship)
 
 class Soldier(object):
     APsToPickup = 4
@@ -109,6 +112,7 @@ class Soldier(object):
         self.aps = 0
         self.inventory = dict()
         self.wieldedItem = None
+        self.health = self.attributes.health
 
     def setPosition(self, pos):
         self.x, self.y = pos[0], pos[1]
@@ -121,24 +125,33 @@ class Soldier(object):
 
     def decreaseHealth(self, num):
         assert num > 0
-        self.attributes.health -= num
-        if self.attributes.health < 0:
-            self.attributes.health = 0
-        if self.attributes.health == 0:
+        self.health -= num
+        if self.health < 0:
+            self.health = 0
+        if self.health == 0:
             self.aps = 0
 
     def alive(self):
-        return self.attributes.health > 0
+        return self.health > 0
+
+    def getStamina(self):
+        return self.attributes.stamina
+
+    def getMarksmanship(self):
+        return self.attributes.marksmanship
+
+    def getMaxHealth(self):
+        return self.attributes.health
 
     def getHealth(self):
-        return self.attributes.health
+        return self.health
 
     def getAPs(self):
         return self.aps
 
     def refreshAPs(self):
         restAPs = self.aps
-        if self.attributes.health > 0:
+        if self.health > 0:
             self.aps = self.attributes.stamina * Soldier.MaxAPs / 100
             self.aps += min(5, restAPs)
             self.aps = min(Soldier.MaxAPs, self.aps)
@@ -612,7 +625,7 @@ class Island(object):
         for s in self.playerSoldiers:
             self.bf.soldiers.append(s)
 
-    def travel(self, direction):
+    def _newLocation(self, direction):
         assert direction >= 1 and direction <= 4
         nx, ny = self.currSector
         if direction == 1:
@@ -624,10 +637,19 @@ class Island(object):
         else:
             nx += 1
         if nx < 0 or ny < 0 or nx >= self.islandSize[0] or ny >= self.islandSize[1]:
+            return None
+        return nx, ny
+
+    def travelAllowed(self, direction):
+        return self._newLocation(direction) is not None
+
+    def travel(self, direction):
+        nloc = self._newLocation(direction)
+        if nloc is None:
             return False
 
         self.bf.removeSoldiersFromTeam(0)
-        self.currSector = nx, ny
+        self.currSector = nloc
         self.placeSoldiers(direction)
         self.time.progress(0, 15, 0)
         return True
@@ -772,6 +794,7 @@ class Battlefield(object):
         return None, newSoldiersSeen, newItemsSeen
 
     def endTurn(self):
+        self.checkFriendly()
         self.moveTarget = None
         assert self.shootLine is None or self.shootLine == list()
         currentTeam = self.getCurrentSoldier().team
@@ -828,6 +851,7 @@ class Battlefield(object):
         if hit:
             self.shootLine = None
             hit.decreaseHealth(40) # TODO: weapon and shooter dependent
+            self.checkFriendly()
             return x, y, hit
         else:
             ol = self.terrain[x][y].overlay
@@ -938,6 +962,29 @@ class Battlefield(object):
         if char:
             self.removeItem(item, pos)
         return char
+
+    def travelAllowed(self, direction):
+        assert direction >= 1 and direction <= 4
+        soldiers = self.soldiersInTeam(0)
+        if not soldiers:
+            return False
+        if self.friendly:
+            return True
+        else:
+            for s in soldiers:
+                if direction == 1 and s.x > 5:
+                    return False
+                elif direction == 2 and s.y < self.h - 5:
+                    return False
+                elif direction == 3 and s.y > 5:
+                    return False
+                elif direction == 4 and s.x < self.w - 5:
+                    return False
+            return True
+
+    def checkFriendly(self):
+        self.friendly = len(self.soldiersInTeam(1)) == 0
+        return self.friendly
 
 def getLine(x0, y0, x1, y1):
     # Bresenham

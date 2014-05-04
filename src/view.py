@@ -116,15 +116,18 @@ class BattlefieldView(object):
         self.controller.cstate.cursorpos = cp
         self.centerScreenTo(cp)
 
-        while self.running and self.controller.cflags.travelling == 0:
+        while self.running:
             self.draw()
             self.getInput(g, ai)
-        if not self.running:
-            return 0
-        else:
-            t = self.controller.cflags.travelling
-            self.controller.cflags.travelling = 0
-            return t
+            if self.controller.cflags.travelling:
+                t = self.controller.cflags.travelling
+                self.controller.cflags.travelling = 0
+                if not self.bf.travelAllowed(t) or not self.island.travelAllowed(t):
+                    self.controller.cstate.message = 'Cannot travel there...'
+                else:
+                    return t
+
+        return 0
 
     def posOnScreen(self, pos):
         cpx, cpy = pos
@@ -233,30 +236,63 @@ class BattlefieldView(object):
         self.stdscr.addstr(0, 0, '%-80s' % msg)
         self.stdscr.addstr(1, self.winx - 10, '%02d:%02d' % (self.island.time.hours, self.island.time.minutes))
 
-    def drawSidePanels(self):
+    def drawOnSidePanels(self, space, strfunc):
         xpos = 0
         ypos = BattlefieldView.statusbarHeight
-        currsold = self.bf.getCurrentSoldier()
         ind = 0
+        fmtstr = '%%-%ds' % (space - 1)
         for sold in self.bf.soldiers:
-            if sold.team == 0:
-                if sold == currsold:
-                    color = 5
-                else:
-                    color = 6
-                self.stdscr.addstr(ypos, xpos, sold.getName(), curses.color_pair(color))
-                if sold.alive():
-                    self.stdscr.addstr(ypos + 1, xpos, 'APs:    %-4d' % sold.getAPs(), curses.color_pair(color))
-                    self.stdscr.addstr(ypos + 2, xpos, 'Health: %-4d' % sold.getHealth(), curses.color_pair(color))
-                else:
-                    assert BattlefieldView.leftPanelWidth == BattlefieldView.rightPanelWidth
-                    self.stdscr.addstr(ypos + 1, xpos, ' ' * (BattlefieldView.leftPanelWidth - 1))
-                    self.stdscr.addstr(ypos + 2, xpos, ' ' * (BattlefieldView.leftPanelWidth - 1))
-                ypos += 3
-                ind += 1
-                if ind == 2:
-                    xpos = self.winx - BattlefieldView.rightPanelWidth + 1
-                    ypos = BattlefieldView.statusbarHeight
+            if sold.team != 0:
+                continue
+
+            color, texts = strfunc(sold)
+            for text in texts:
+                self.stdscr.addstr(ypos, xpos, fmtstr % text, curses.color_pair(color))
+                ypos += 1
+            ind += 1
+            if ind == 2:
+                xpos = self.winx - space + 1
+                ypos = BattlefieldView.statusbarHeight
+
+    def drawStats(self):
+        def myfunc(sold):
+            ret = list()
+            ret.append(sold.getName())
+            if sold.alive():
+                ret.append('Health:       %-4d' % sold.getMaxHealth())
+                ret.append('Stamina:      %-4d' % sold.getStamina())
+                ret.append('Marksmanship: %-4d' % sold.getStamina())
+            else:
+                for i in xrange(3):
+                    ret.append(' ' * (BattlefieldView.leftPanelWidth - 1))
+            for i in xrange(2):
+                ret.append(' ' * (BattlefieldView.leftPanelWidth - 1))
+            return 0, ret
+        self.drawOnSidePanels(20, myfunc)
+
+    def drawSidePanels(self):
+        currsold = self.bf.getCurrentSoldier()
+        def myfunc(sold):
+            ret = list()
+            if sold == currsold:
+                color = 5
+            else:
+                color = 6
+            ret.append(sold.getName())
+            if sold.alive():
+                ret.append('APs:     %-4d' % sold.getAPs())
+                ret.append('HPs:     %-3d' % sold.getHealth())
+                ret.append('WPs:     %-3d' % sold.getHealth())
+                ret.append('Max HPs: %-3d' % sold.getMaxHealth())
+            else:
+                for i in xrange(2):
+                    ret.append(' ' * (BattlefieldView.leftPanelWidth - 1))
+            ret.append('')
+            return color, ret
+
+        assert BattlefieldView.leftPanelWidth == BattlefieldView.rightPanelWidth
+        self.drawOnSidePanels(50, lambda x: (0, [''] * 5))
+        self.drawOnSidePanels(BattlefieldView.leftPanelWidth, myfunc)
 
     def drawInfobar(self):
         xpos = 0
@@ -298,6 +334,8 @@ class BattlefieldView(object):
     def drawOverlay(self):
         soldier = self.bf.getCurrentSoldier()
         row = 5
+        if self.controller.cstate.showStats:
+            self.drawStats()
         if self.controller.cstate.showInventory:
             inv = soldier.getInventory()
             showInv = True
@@ -337,12 +375,12 @@ class BattlefieldView(object):
 
     def draw(self):
         self.checkCenter()
+        self.drawSidePanels()
         self.drawTerrain()
         self.drawItems()
         self.drawPeople()
         self.drawPath()
         self.drawBullet()
-        self.drawSidePanels()
         self.drawInfobar()
         self.drawHeader()
         if not self.drawOverlay():
