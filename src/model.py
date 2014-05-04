@@ -209,6 +209,10 @@ class TerrainCreator(object):
                         self.bf.terrain[i][j] = Tile(Tile.Base.Grass, Tile.Overlay.Tree)
 
     def addCoastLine(self, width, border):
+        length = self._addInitialCoast(width, border)
+        self._variateCoast(width, border, length)
+
+    def _addInitialCoast(self, width, border):
         assert border >= 1 and border <= 4
         if border == 1:
             length = self.bf.h
@@ -230,6 +234,9 @@ class TerrainCreator(object):
             for i in xrange(self.bf.w - width, self.bf.w):
                 for j in xrange(self.bf.h):
                     self.bf.terrain[i][j] = Tile(Tile.Base.Water, Tile.Overlay.NoOverlay)
+        return length
+
+    def _variateCoast(self, width, border, length):
         for i in xrange(6, 1, -1):
             for iteration in xrange(length / 4):
                 rad = random.randrange(1, i)
@@ -256,65 +263,71 @@ class TerrainCreator(object):
                                 if water:
                                     self.bf.terrain[px][py].overlay = Tile.Overlay.NoOverlay
 
+    def _createInitialHouse(self):
+        hwidth = random.randrange(5, 15)
+        hheight = random.randrange(5, 15)
+        hx = random.randrange(5, self.bf.w - hwidth - 5)
+        hy = random.randrange(5, self.bf.h - hheight - 5)
+        # now check whether the house would be in water or within another house
+        for i in xrange(hx - 3, hx + hwidth + 1 + 3):
+            for j in xrange(hy - 3, hy + hheight + 1 + 3):
+                if self.bf.terrain[i][j].base == Tile.Base.Water or self.bf.terrain[i][j].base == Tile.Base.Floor:
+                    return None
+        return hx, hy, hwidth, hheight
+
+    def _createHouseWalls(self, hx, hy, hwidth, hheight):
+        for i in xrange(hx, hx + hwidth + 1):
+            self.bf.terrain[i][hy] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
+        for i in xrange(hx, hx + hwidth + 1):
+            self.bf.terrain[i][hy + hheight] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
+        for i in xrange(hy, hy + hheight + 1):
+            self.bf.terrain[hx][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
+        for i in xrange(hy, hy + hheight + 1):
+            self.bf.terrain[hx + hwidth][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
+
+        # create floor
+        for i in xrange(hx + 1, hx + hwidth):
+            for j in xrange(hy + 1, hy + hheight):
+                self.bf.terrain[i][j] = Tile(Tile.Base.Floor, Tile.Overlay.NoOverlay)
+
+    def _createHouseDoor(self, hx, hy, hwidth, hheight):
+        dwall = random.choice(range(4))
+        if dwall == 0 or dwall == 1:
+            dx = hx + random.randrange(2, hwidth - 1)
+            if dwall == 0:
+                dy = hy
+            else:
+                dy = hy + hheight
+        else:
+            dy = hy + random.randrange(2, hheight - 1)
+            if dwall == 2:
+                dx = hx
+            else:
+                dx = hx + hwidth
+        self.bf.terrain[dx][dy] = Tile(Tile.Base.Floor, Tile.Overlay.NoOverlay)
+
+        # clear trees right at the door
+        for i in xrange(dx - 1, dx + 2):
+            for j in xrange(dy - 1, dy + 2):
+                if self.bf.terrain[i][j].overlay == Tile.Overlay.Tree:
+                    self.bf.terrain[i][j].overlay = Tile.Overlay.NoOverlay
+
+        self.doorways.append((dx, dy))
+
     def addHouse(self):
         assert self.bf.w >= 30 and self.bf.h >= 30
         # multiple tries to ensure the house is not in water or within another house
         for tries in xrange(10):
-            hwidth = random.randrange(5, 15)
-            hheight = random.randrange(5, 15)
-            hx = random.randrange(5, self.bf.w - hwidth - 5)
-            hy = random.randrange(5, self.bf.h - hheight - 5)
-            # now check whether the house would be in water or within another house
-            blocked = False
-            for i in xrange(hx - 3, hx + hwidth + 1 + 3):
-                for j in xrange(hy - 3, hy + hheight + 1 + 3):
-                    if self.bf.terrain[i][j].base == Tile.Base.Water or self.bf.terrain[i][j].base == Tile.Base.Floor:
-                        blocked = True
-                        break
-                if blocked:
-                    break
-            if blocked:
+            houseparams = self._createInitialHouse()
+            if not houseparams:
                 continue
 
             # not in water:
             # create walls
-            for i in xrange(hx, hx + hwidth + 1):
-                self.bf.terrain[i][hy] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
-            for i in xrange(hx, hx + hwidth + 1):
-                self.bf.terrain[i][hy + hheight] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
-            for i in xrange(hy, hy + hheight + 1):
-                self.bf.terrain[hx][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
-            for i in xrange(hy, hy + hheight + 1):
-                self.bf.terrain[hx + hwidth][i] = Tile(Tile.Base.Floor, Tile.Overlay.Wall)
-
-            # create floor
-            for i in xrange(hx + 1, hx + hwidth):
-                for j in xrange(hy + 1, hy + hheight):
-                    self.bf.terrain[i][j] = Tile(Tile.Base.Floor, Tile.Overlay.NoOverlay)
+            self._createHouseWalls(*houseparams)
 
             # create door
-            dwall = random.choice(range(4))
-            if dwall == 0 or dwall == 1:
-                dx = hx + random.randrange(2, hwidth - 1)
-                if dwall == 0:
-                    dy = hy
-                else:
-                    dy = hy + hheight
-            else:
-                dy = hy + random.randrange(2, hheight - 1)
-                if dwall == 2:
-                    dx = hx
-                else:
-                    dx = hx + hwidth
-            self.bf.terrain[dx][dy] = Tile(Tile.Base.Floor, Tile.Overlay.NoOverlay)
-
-            # clear trees right at the door
-            for i in xrange(dx - 1, dx + 2):
-                for j in xrange(dy - 1, dy + 2):
-                    if self.bf.terrain[i][j].overlay == Tile.Overlay.Tree:
-                        self.bf.terrain[i][j].overlay = Tile.Overlay.NoOverlay
-
-            self.doorways.append((dx, dy))
+            self._createHouseDoor(*houseparams)
             return
 
     def addPaths(self):
@@ -376,7 +389,7 @@ class TeamAI(object):
         offScores = list([0])
         for e in enemies:
             epos = e.getPosition()
-            line = self.bf.line(pos[0], pos[1], epos[0], epos[1])[1:-1]
+            line = getLine(pos[0], pos[1], epos[0], epos[1])[1:-1]
             defScores.append(self.coverScore(line))
             offScores.append(self.attackScore(line))
         return min(defScores), max(offScores)
@@ -400,14 +413,8 @@ class TeamAI(object):
                 return 0
         return score
 
-    def findCombatPosition(self, soldier, enemies):
-        assert enemies
-        nearbyTrees = list()
-        myposx, myposy = soldier.getPosition()
-        for x in xrange(max(0, myposx - 5), min(self.bf.w, myposx + 5)):
-            for y in xrange(max(0, myposy - 5), min(self.bf.h, myposy + 5)):
-                if self.bf.terrain[x][y].overlay == Tile.Overlay.Tree:
-                    nearbyTrees.append((x, y))
+    def _getPossibleCoverPositions(self, nearbyTrees, soldier, enemies):
+        mypos = soldier.getPosition()
         positionsBehindTrees = set()
         for tx, ty in nearbyTrees:
             for e in enemies:
@@ -419,8 +426,19 @@ class TeamAI(object):
                     px -= math.copysign(1, dx)
                 if not abs(dx) > 2 * abs(dy):
                     py -= math.copysign(1, dy)
-                if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h and (myposx, myposy == px, py or self.bf.passable(px, py)):
+                if px >= 0 and py >= 0 and px < self.bf.w and py < self.bf.h and (mypos == px, py or self.bf.passable(px, py)):
                     positionsBehindTrees.add((px, py))
+        return positionsBehindTrees
+
+    def findCombatPosition(self, soldier, enemies):
+        assert enemies
+        nearbyTrees = list()
+        myposx, myposy = soldier.getPosition()
+        for x in xrange(max(0, myposx - 5), min(self.bf.w, myposx + 5)):
+            for y in xrange(max(0, myposy - 5), min(self.bf.h, myposy + 5)):
+                if self.bf.terrain[x][y].overlay == Tile.Overlay.Tree:
+                    nearbyTrees.append((x, y))
+        positionsBehindTrees = self._getPossibleCoverPositions(nearbyTrees, soldier, enemies)
 
         if not positionsBehindTrees:
             return None
@@ -430,12 +448,15 @@ class TeamAI(object):
             defScore, offScore = self.getPositionScores((px, py), enemies)
             places[(px, py)] = defScore, offScore
 
+        return self._decideCombatPosition(soldier, places)
+
+    def _decideCombatPosition(self, soldier, places):
         personality = self.personalities[soldier]
         if personality == TeamAI.Personality.Defensive:
-            best = sorted(places.items(), key = lambda (k, (d, o)): d, reverse = True)
+            best = sorted(places.items(), key=lambda (k, (d, o)): d, reverse=True)
             return best[0][0]
         elif personality == TeamAI.Personality.Offensive:
-            best = sorted(places.items(), key = lambda (k, (d, o)): o, reverse = True)
+            best = sorted(places.items(), key=lambda (k, (d, o)): o, reverse=True)
             return best[0][0]
         else:
             assert False
@@ -448,7 +469,7 @@ class TeamAI(object):
         bestTarget = None
         for e in enemies:
             epos = e.getPosition()
-            line = self.bf.line(mypos[0], mypos[1], epos[0], epos[1])[1:-1]
+            line = getLine(mypos[0], mypos[1], epos[0], epos[1])[1:-1]
             offScore = self.attackScore(line)
             if offScore > bestScore:
                 bestScore = offScore
@@ -497,7 +518,7 @@ class TeamAI(object):
                 self.bf.moveTo(cover[0], cover[1])
 
 class Island(object):
-    def __init__(self, seed = None):
+    def __init__(self, seed=None):
         if seed is None:
             seed = int(time.time())
         random.seed(seed)
@@ -506,6 +527,7 @@ class Island(object):
         self.sectors = dict()
         self.currSector = 2, 3
         self.islandSize = 3, 4
+        self.bf = None
 
         for i in xrange(3):
             self.sectors[i] = dict()
@@ -558,7 +580,7 @@ class Island(object):
                 yd = -1
             elif direction == 4:
                 x = 0
-            for j in xrange(10):
+            for tries in xrange(10):
                 if self.bf.passable(x, y):
                     break
                 x += xd
@@ -646,7 +668,7 @@ class Battlefield(object):
             tc.addCoastLine(8, 3)
         if border & 0x08:
             tc.addCoastLine(8, 4)
-        for i in xrange(3):
+        for tries in xrange(3):
             tc.addHouse()
         tc.addPaths()
         tc.addWeapon()
@@ -763,7 +785,7 @@ class Battlefield(object):
             return False
 
         soldpos = sold.getPosition()
-        shootLine = self.line(soldpos[0], soldpos[1], x, y)
+        shootLine = getLine(soldpos[0], soldpos[1], x, y)
         self.shootLine = shootLine[1:10]
         self.shotDistance = 0
         return True
@@ -801,36 +823,6 @@ class Battlefield(object):
                 return x, y, None
             else:
                 return None
-
-    def line(self, x0, y0, x1, y1):
-        # Bresenham
-        dx = abs(x1 - x0)
-        dy = abs(y1 - y0)
-        if x0 < x1: sx = 1
-        else:       sx = -1
-        if y0 < y1: sy = 1
-        else:       sy = -1
-        err = dx - dy
-        origErr = err
-
-        ret = list()
-        errRet = list()
-
-        while True:
-            if x0 == x1 and y0 == y1:
-                errRet.append(0)
-            else:
-                errRet.append(abs((origErr - err) / float(max(dx, dy))))
-            ret.append((x0, y0))
-            if x0 == x1 and y0 == y1:
-                return zip(ret, errRet)
-            e2 = 2 * err
-            if e2 > -dy:
-                err = err - dy
-                x0 = x0 + sx
-            if e2 < dx:
-                err = err + dx
-                y0 = y0 + sy
 
     def addItem(self, item, position):
         self.items[position].append(item)
@@ -895,7 +887,7 @@ class Battlefield(object):
 
     def visibilityTo(self, soldier, position):
         spos = soldier.getPosition()
-        line = self.line(spos[0], spos[1], position[0], position[1])[1:-1]
+        line = getLine(spos[0], spos[1], position[0], position[1])[1:-1]
         visibility = 1.0
         for (lx, ly), e in line:
             ol = self.terrain[lx][ly].overlay
@@ -922,4 +914,39 @@ class Battlefield(object):
         if char:
             self.removeItem(item, pos)
         return char
+
+def getLine(x0, y0, x1, y1):
+    # Bresenham
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    if x0 < x1:
+        sx = 1
+    else:
+        sx = -1
+    if y0 < y1:
+        sy = 1
+    else:
+        sy = -1
+    err = dx - dy
+    origErr = err
+
+    ret = list()
+    errRet = list()
+
+    while True:
+        if x0 == x1 and y0 == y1:
+            errRet.append(0)
+        else:
+            errRet.append(abs((origErr - err) / float(max(dx, dy))))
+        ret.append((x0, y0))
+        if x0 == x1 and y0 == y1:
+            return zip(ret, errRet)
+        e2 = 2 * err
+        if e2 > -dy:
+            err = err - dy
+            x0 = x0 + sx
+        if e2 < dx:
+            err = err + dx
+            y0 = y0 + sy
+
 

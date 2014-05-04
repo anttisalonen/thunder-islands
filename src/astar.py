@@ -53,7 +53,7 @@ def solve(graphfunc, costfunc, heurfunc, goaltestfunc, start):
                 costHere[child] = thisGCost
         if not openNodes:
             break
-    
+
     if not path:
         return None
 

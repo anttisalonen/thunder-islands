@@ -89,47 +89,50 @@ class BattlefieldView(object):
         self.stdscr = stdscr
         self.island = island
         self.bf = self.island.getCurrentBattlefield()
-        self.path = Path(self.bf, (0,0), (0,0))
+        self.path = Path(self.bf, (0, 0), (0, 0))
         self.animDelay = 0
         self.hitPoint = None
         self.screenOffset = 0, 0
         self.reportedSoldiers = set()
         self.reportedItems = set()
-
-    def run(self):
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
-        self.controller = controller.Controller(self.bf)
-        cp = self.bf.getCurrentSoldier().getPosition()
-        self.controller.state.cursorpos = cp
-        self.centerScreenTo(cp)
 
-        # initialise generators/coroutines
+        self.controller = controller.Controller(self.bf)
         self.ai = model.TeamAI(self.bf)
+
+    def run(self):
+        # initialise coroutines
         ai = self.ai.getInput()
         ai.next()
         g = self.controller.getInput()
         g.next()
 
-        while self.running and self.controller.state.travelling == 0:
+        cp = self.bf.getCurrentSoldier().getPosition()
+        self.controller.cstate.cursorpos = cp
+        self.centerScreenTo(cp)
+
+        while self.running and self.controller.cflags.travelling == 0:
             self.draw()
             self.getInput(g, ai)
         if not self.running:
             return 0
         else:
-            return self.controller.state.travelling
+            t = self.controller.cflags.travelling
+            self.controller.cflags.travelling = 0
+            return t
 
     def posOnScreen(self, pos):
         cpx, cpy = pos
         return cpx - self.screenOffset[0] + BattlefieldView.leftPanelWidth, cpy - self.screenOffset[1] + BattlefieldView.statusbarHeight
 
     def cursorPosOnScreen(self):
-        return self.posOnScreen(self.controller.state.cursorpos)
+        return self.posOnScreen(self.controller.cstate.cursorpos)
 
     def checkCenter(self):
-        if self.controller.state.center == True:
-            self.controller.state.center = False
-            self.centerScreenTo(self.controller.state.cursorpos)
+        if self.controller.cflags.center == True:
+            self.controller.cflags.center = False
+            self.centerScreenTo(self.controller.cstate.cursorpos)
 
     def possibleCenterOffset(self, cp):
         sx = cp[0] - self.mainWindowWidth() / 2
@@ -217,8 +220,8 @@ class BattlefieldView(object):
         assert False, '%s' % item
 
     def drawHeader(self):
-        if self.controller.state.message:
-            msg = self.controller.state.message[:79]
+        if self.controller.cstate.message:
+            msg = self.controller.cstate.message[:79]
         else:
             msg = ''
         self.stdscr.addstr(0, 0, '%-80s' % msg)
@@ -260,15 +263,15 @@ class BattlefieldView(object):
                 infostr = '                    '
             self.stdscr.addstr(ypos + 0, xpos, infostr)
 
-            if self.controller.state.aiming != 0:
-                dist = self.bf.distance(currsold.getPosition(), self.controller.state.cursorpos)
-                shootstr = 'Shooting. Aim: %d, distance: %d     ' % (self.controller.state.aiming, dist)
+            if self.controller.cstate.aiming != 0:
+                dist = self.bf.distance(currsold.getPosition(), self.controller.cstate.cursorpos)
+                shootstr = 'Shooting. Aim: %d, distance: %d     ' % (self.controller.cstate.aiming, dist)
             else:
                 shootstr = ' ' * 40
             self.stdscr.addstr(ypos + 1, xpos, shootstr)
-            coordTuple = (self.controller.state.cursorpos[0], self.controller.state.cursorpos[1], self.screenOffset[0], self.screenOffset[1])
+            coordTuple = (self.controller.cstate.cursorpos[0], self.controller.cstate.cursorpos[1], self.screenOffset[0], self.screenOffset[1])
             self.stdscr.addstr(ypos + 2, xpos, '(%d, %d) (%d, %d)       ' % coordTuple)
-            self.stdscr.addstr(ypos + 3, xpos, '%d  ' % self.controller.state.pressedKeyCode)
+            self.stdscr.addstr(ypos + 3, xpos, '%d  ' % self.controller.cstate.pressedKeyCode)
 
     def drawPath(self):
         if self.bf.shootLine:
@@ -276,7 +279,7 @@ class BattlefieldView(object):
         soldier = self.bf.getCurrentSoldier()
         if soldier.team != 0:
             return
-        self.path.changeCoord(soldier.getPosition(), self.controller.state.cursorpos)
+        self.path.changeCoord(soldier.getPosition(), self.controller.cstate.cursorpos)
         if self.path.getPath():
             for p in self.path.getPath()[1:]:
                 if p[1] < soldier.getAPs():
@@ -288,15 +291,15 @@ class BattlefieldView(object):
     def drawOverlay(self):
         soldier = self.bf.getCurrentSoldier()
         row = 5
-        if self.controller.state.showInventory:
+        if self.controller.cstate.showInventory:
             inv = soldier.getInventory()
             showInv = True
             if not inv:
                 msg = 'Inventory is empty.'
                 self.stdscr.addstr(row, 30, '%-30s' % msg)
                 return True
-        elif self.controller.state.showPickupMenu:
-            inv = self.controller.state.itemMenu
+        elif self.controller.cstate.showPickupMenu:
+            inv = self.controller.cstate.itemMenu
             showInv = False
         else:
             return False
@@ -307,7 +310,7 @@ class BattlefieldView(object):
             row += 1
         return True
 
-    def addch(self, pos, ch, color, attr = 0):
+    def addch(self, pos, ch, color, attr=0):
         pos = self.posOnScreen(pos)
         if pos[1] < self.winy - BattlefieldView.infobarHeight and \
                 pos[1] >= BattlefieldView.statusbarHeight and \
@@ -342,7 +345,7 @@ class BattlefieldView(object):
 
     def getInput(self, g, ai):
         if not self.bf.soldiersInTeam(0) and not self.bf.isFriendly():
-            self.controller.state.message = 'Sector lost!'
+            self.controller.cstate.message = 'Sector lost!'
             c = self.stdscr.getch()
             self.running = c != ord('q')
             return
@@ -352,72 +355,78 @@ class BattlefieldView(object):
             ai.send(None)
 
         if self.bf.moveTarget or self.bf.shootLine or self.hitPoint:
-            curses.curs_set(0)
-            if self.animDelay > 0:
-                self.animDelay -= 1
-            else:
-                self.hitPoint = None
-                if self.bf.moveTarget:
-                    self.animDelay = BattlefieldView.walkAnimDelay
-                    self.reportedSoldiers = self.bf.enemySoldiersSeenByTeam(0)
-                    noaps, newSoldiers, newItems = self.bf.updateMovement()
-                    if soldier.team == 0:
-                        brandNewSoldiers = newSoldiers - self.reportedSoldiers
-                        brandNewItem = None
-                        for itpos, it in newItems:
-                            if it not in self.reportedItems:
-                                self.reportedItems.add(it)
-                                brandNewItem = itpos, it
-                        self.reportedSoldiers |= brandNewSoldiers
-                        center = soldier.getPosition()
-                        if brandNewSoldiers:
-                            self.controller.state.message = '%s: I see an enemy!' % soldier.getName()
-                            self.bf.moveTarget = None
-                            center = brandNewSoldiers.pop().getPosition()
-                        elif brandNewItem:
-                            self.controller.state.message = '%s: There\'s something here.' % soldier.getName()
-                            self.bf.moveTarget = None
-                            center = brandNewItem[0]
-                        elif noaps:
-                            self.controller.state.message = 'No more APs to move.'
-                        if center:
-                            self.controller.state.cursorpos = center
-                            self.adjustCenter(center)
-                            self.checkScreenScroll()
-                    else:
-                        assert soldier.team == 1
-                        self.ai.movementUpdated(noaps, newSoldiers, newItems)
-                        if self.bf.soldierSeenByTeam(0, soldier):
-                            center = soldier.getPosition()
-                            self.controller.state.cursorpos = center
-                            self.adjustCenter(center)
-                            self.checkScreenScroll()
-                        # if the enemy movement was seen by the player, report it
-                        enemiesSeen = self.bf.enemySoldiersSeenByTeam(0)
-                        brandNewSoldiers = enemiesSeen - self.reportedSoldiers
-                        self.reportedSoldiers |= brandNewSoldiers
-                        if brandNewSoldiers:
-                            self.controller.state.message = 'Enemy sighted!'
-                else:
-                    self.animDelay = BattlefieldView.shotAnimDelay
-                    if self.bf.shootLine:
-                        self.hitPoint = self.bf.updateShot()
-                        if self.hitPoint:
-                            soldierHit = self.hitPoint[2]
-                            if soldierHit:
-                                self.controller.state.message = 'Hit %s!' % soldierHit.getName()
-
+            self._animate()
         else:
             if soldier.team == 0:
                 curses.curs_set(1)
                 c = self.stdscr.getch()
                 g.send(c)
-                self.running = self.controller.state.running
-                if self.controller.state.droppedItem is not None:
-                    self.reportedItems.add(self.controller.state.droppedItem)
-                    self.controller.state.droppedItem = None
-                self.adjustCenter(self.controller.state.cursorpos)
+                self.running = self.controller.cflags.running
+                if self.controller.cflags.droppedItem is not None:
+                    self.reportedItems.add(self.controller.cflags.droppedItem)
+                    self.controller.cflags.droppedItem = None
+                self.adjustCenter(self.controller.cstate.cursorpos)
                 self.checkScreenScroll()
+
+    def _animate(self):
+        curses.curs_set(0)
+        if self.animDelay > 0:
+            self.animDelay -= 1
+        else:
+            self.hitPoint = None
+            if self.bf.moveTarget:
+                self._animateMovement()
+            else:
+                self.animDelay = BattlefieldView.shotAnimDelay
+                if self.bf.shootLine:
+                    self.hitPoint = self.bf.updateShot()
+                    if self.hitPoint:
+                        soldierHit = self.hitPoint[2]
+                        if soldierHit:
+                            self.controller.cstate.message = 'Hit %s!' % soldierHit.getName()
+
+    def _animateMovement(self):
+        soldier = self.bf.getCurrentSoldier()
+        self.animDelay = BattlefieldView.walkAnimDelay
+        self.reportedSoldiers = self.bf.enemySoldiersSeenByTeam(0)
+        noaps, newSoldiers, newItems = self.bf.updateMovement()
+        if soldier.team == 0:
+            brandNewSoldiers = newSoldiers - self.reportedSoldiers
+            brandNewItem = None
+            for itpos, it in newItems:
+                if it not in self.reportedItems:
+                    self.reportedItems.add(it)
+                    brandNewItem = itpos, it
+            self.reportedSoldiers |= brandNewSoldiers
+            center = soldier.getPosition()
+            if brandNewSoldiers:
+                self.controller.cstate.message = '%s: I see an enemy!' % soldier.getName()
+                self.bf.moveTarget = None
+                center = brandNewSoldiers.pop().getPosition()
+            elif brandNewItem:
+                self.controller.cstate.message = '%s: There\'s something here.' % soldier.getName()
+                self.bf.moveTarget = None
+                center = brandNewItem[0]
+            elif noaps:
+                self.controller.cstate.message = 'No more APs to move.'
+            if center:
+                self.controller.cstate.cursorpos = center
+                self.adjustCenter(center)
+                self.checkScreenScroll()
+        else:
+            assert soldier.team == 1
+            self.ai.movementUpdated(noaps, newSoldiers, newItems)
+            if self.bf.soldierSeenByTeam(0, soldier):
+                center = soldier.getPosition()
+                self.controller.cstate.cursorpos = center
+                self.adjustCenter(center)
+                self.checkScreenScroll()
+            # if the enemy movement was seen by the player, report it
+            enemiesSeen = self.bf.enemySoldiersSeenByTeam(0)
+            brandNewSoldiers = enemiesSeen - self.reportedSoldiers
+            self.reportedSoldiers |= brandNewSoldiers
+            if brandNewSoldiers:
+                self.controller.cstate.message = 'Enemy sighted!'
 
     def mainWindowWidth(self):
         return self.winx - BattlefieldView.leftPanelWidth - 1 - BattlefieldView.rightPanelWidth
@@ -427,7 +436,7 @@ class BattlefieldView(object):
 
     def checkScreenScroll(self):
         # ensure cursor is within borders
-        cp = self.controller.state.cursorpos
+        cp = self.controller.cstate.cursorpos
         sx = max(0, self.screenOffset[0], cp[0] - self.mainWindowWidth())
         sx = min(cp[0], sx)
         sy = max(0, self.screenOffset[1], cp[1] - self.mainWindowHeight())
