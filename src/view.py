@@ -3,6 +3,7 @@
 import curses
 import os
 import argparse
+import cPickle as pickle
 
 import model
 import controller
@@ -36,9 +37,12 @@ class Path(object):
             self.calcPathCost()
 
 class View(object):
-    def __init__(self, stdscr, seed):
+    def __init__(self, stdscr, seed, island):
         self.stdscr = stdscr
-        self.island = model.Island(seed)
+        if island:
+            self.island = island
+        else:
+            self.island = model.Island(seed)
 
         curses.noecho()
         curses.cbreak()
@@ -60,7 +64,7 @@ class View(object):
         curses.init_pair(11, 33, 7) # soldier team 1, selected
 
         self.stdscr.leaveok(0)
-        self.view = BattlefieldView(self.stdscr, self.island)
+        self.view = BattlefieldView(self.stdscr, self.island, self.island)
 
     def run(self):
         while True:
@@ -75,7 +79,7 @@ class View(object):
             else:
                 travelled = self.island.travel(ret)
                 if travelled:
-                    self.view = BattlefieldView(self.stdscr, self.island)
+                    self.view = BattlefieldView(self.stdscr, self.island, self.island)
 
 class BattlefieldView(object):
     infobarHeight = 4
@@ -85,7 +89,7 @@ class BattlefieldView(object):
     shotAnimDelay = 1
     walkAnimDelay = 20
 
-    def __init__(self, stdscr, island):
+    def __init__(self, stdscr, island, saveable):
         self.stdscr = stdscr
         self.island = island
         self.bf = self.island.getCurrentBattlefield()
@@ -98,7 +102,7 @@ class BattlefieldView(object):
         self.winy, self.winx = self.stdscr.getmaxyx()
         self.running = True
 
-        self.controller = controller.Controller(self.bf)
+        self.controller = controller.Controller(self.bf, saveable)
         self.ai = model.TeamAI(self.bf)
 
     def run(self):
@@ -444,15 +448,21 @@ class BattlefieldView(object):
         self.screenOffset = sx, sy
 
 
-def main(stdscr, seed):
-    view = View(stdscr, seed)
+def main(stdscr, seed, loadfile):
+    if loadfile:
+        with open(loadfile, 'rb') as f:
+            island = pickle.load(f)
+    else:
+        island = None
+    view = View(stdscr, seed, island)
     view.run()
 
 if __name__ == '__main__':
     os.environ['TERM'] = 'xterm-256color'
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--seed', help='random seed', type=int, default=231)
+    parser.add_argument('-s', '--seed', help='random seed', type=int, default=231, dest='seed')
+    parser.add_argument('-l', '--load', help='load game', type=str, default=None, dest='loadfile')
     args = parser.parse_args()
-    curses.wrapper(lambda stdscr: main(stdscr, args.seed))
+    curses.wrapper(lambda stdscr: main(stdscr, args.seed, args.loadfile))
 

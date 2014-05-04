@@ -2,6 +2,7 @@
 
 import curses
 import string
+import cPickle as pickle
 
 import model
 
@@ -57,8 +58,9 @@ def exitItemMenu(c):
     return c == ord(' ') or c == ord('\n')
 
 class Controller(model.BattlefieldListener):
-    def __init__(self, bf):
+    def __init__(self, bf, saveable):
         self.bf = bf
+        self.saveable = saveable
         self.soldierCursorPos = dict()
         self.warp = False
         self.cstate = ViewState(self.bf)
@@ -177,6 +179,13 @@ class Controller(model.BattlefieldListener):
                 self.cstate.message = 'Controlling %s.' % self.bf.getCurrentSoldier().getName()
         elif cc == 'c' or cc == 'z':
             self.cflags.center = True
+        elif cc == 's':
+            self._saveGame()
+
+    def _saveGame(self):
+        with open('game.sav', 'wb') as f:
+            pickle.dump(self.saveable, f)
+        self.cstate.message = 'Game saved.'
 
     def _handleAction(self, c):
         try:
