@@ -147,7 +147,9 @@ class BattlefieldView(object):
 
     def adjustCenter(self, cp):
         px, py = self.possibleCenterOffset(cp)
-        self.screenOffset = px, py
+        if abs(px - self.screenOffset[0]) > self.mainWindowWidth() / 4 or \
+                abs(py - self.screenOffset[1]) > self.mainWindowHeight() / 4:
+            self.screenOffset = px, py
 
     def centerScreenTo(self, cp):
         self.screenOffset = self.possibleCenterOffset(cp)
