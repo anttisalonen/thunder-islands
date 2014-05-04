@@ -9,7 +9,7 @@ import string
 import astar
 import log
 
-class InvalidMovementError(object):
+class InvalidMovementError(RuntimeError):
     pass
 
 class Tile(object):
